@@ -1,2 +1,5 @@
 [workspace]
 members = ["semaphore_aggregation", "samples"]
+
+[patch."https://github.com/DoHoonKim8/plonky2"]
+plonky2 = { git = "https://github.com/InternetMaximalism/plonky2", rev = "a3b02bd" }

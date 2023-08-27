@@ -1,7 +1,5 @@
 use anyhow::Result;
 use plonky2::field::types::Field;
-use plonky2::fri::reduction_strategies::FriReductionStrategy;
-use plonky2::fri::FriConfig;
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
@@ -16,26 +14,13 @@ fn main() -> Result<()> {
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
 
-    let config = CircuitConfig::standard_recursion_config();
-    let inner_stark_verifier_config = CircuitConfig {
-        zero_knowledge: false, // or true
-        fri_config: FriConfig {
-            rate_bits: 3,
-            cap_height: 4,
-            proof_of_work_bits: 16,
-            reduction_strategy: FriReductionStrategy::ConstantArityBits(1, 5),
-            num_query_rounds: 28,
-        },
-        ..config
-    };
-    let stark_verifier_config = inner_stark_verifier_config.clone();
+    let inner_stark_verifier_config = CircuitConfig::standard_inner_stark_verifier_config();
+    let stark_verifier_config = CircuitConfig::standard_stark_verifier_config();
 
     let inner_config = CircuitConfig {
         zero_knowledge: true, // or false
-        ..inner_stark_verifier_config.clone()
+        ..CircuitConfig::standard_recursion_config()
     };
-
-    // XXX: This test is not passed in the case of standard_recursion_config.
     let mut builder = CircuitBuilder::<F, D>::new(inner_config);
 
     // The arithmetic circuit.
@@ -65,7 +50,7 @@ fn main() -> Result<()> {
     circuit_data.verify(proof_with_pis.clone())?;
 
     let mut builder = CircuitBuilder::<F, D>::new(inner_stark_verifier_config);
-    let proof_with_pis_t = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
+    let proof_with_pis_t = builder.add_virtual_proof_with_pis(&circuit_data.common);
     let inner_verifier_data_t = builder.constant_verifier_data(&circuit_data.verifier_only);
     builder.verify_proof::<C>(
         &proof_with_pis_t,
@@ -81,7 +66,7 @@ fn main() -> Result<()> {
     let proof_with_pis = circuit_data.prove(pw)?;
 
     let mut builder = CircuitBuilder::<F, D>::new(stark_verifier_config);
-    let proof_with_pis_t = builder.add_virtual_proof_with_pis::<C>(&circuit_data.common);
+    let proof_with_pis_t = builder.add_virtual_proof_with_pis(&circuit_data.common);
     let inner_verifier_data_t = builder.constant_verifier_data(&circuit_data.verifier_only);
     builder.verify_proof::<C>(
         &proof_with_pis_t,
