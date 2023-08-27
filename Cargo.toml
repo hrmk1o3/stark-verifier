@@ -1,0 +1,2 @@
+[workspace]
+members = ["semaphore_aggregation", "samples"]

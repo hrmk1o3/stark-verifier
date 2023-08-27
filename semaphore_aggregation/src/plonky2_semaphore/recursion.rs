@@ -31,13 +31,7 @@ impl AccessSet {
     ) -> (Signal, VerifierCircuitData<F, C, 2>) {
         let config = CircuitConfig {
             zero_knowledge: true,
-            num_wires: 135,
-            num_routed_wires: 80,
-            num_constants: 2,
-            use_base_arithmetic_gate: true,
-            security_bits: 100,
-            num_challenges: 2,
-            max_quotient_degree_factor: 8,
+            use_interpolation_gate: false,
             fri_config: FriConfig {
                 rate_bits: 3,
                 cap_height: 4,
@@ -45,6 +39,7 @@ impl AccessSet {
                 reduction_strategy: FriReductionStrategy::ConstantArityBits(1, 5), // 3, 5
                 num_query_rounds: 28,                                              // 28
             },
+            ..CircuitConfig::standard_recursion_config()
         };
         let mut builder = CircuitBuilder::new(config);
         let mut pw = PartialWitness::new();
@@ -277,7 +272,7 @@ mod tests {
             recursion::report_elapsed,
             signal::{Digest, F},
         },
-        snark::verifier_api::{verify_inside_snark, verify_inside_snark_mock},
+        snark::verifier_api::{verify_inside_snark, verify_inside_snark_mock, gen_srs},
     };
 
     fn semaphore_aggregation(
@@ -347,11 +342,12 @@ mod tests {
                 .chain(final_signal.topics.clone().into_iter().flatten().to_owned())
                 .collect(),
         };
+        let srs = gen_srs(23);
         verify_inside_snark((
             proof,
             verifier_circuit_data.verifier_only.clone(),
             verifier_circuit_data.common.clone(),
-        ));
+        ), &srs);
 
         Ok(())
     }

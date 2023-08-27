@@ -15,7 +15,7 @@ use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
 use plonky2::plonk::config::Hasher;
 use plonky2::plonk::proof::ProofWithPublicInputs;
 
-use crate::snark::verifier_api::verify_inside_snark;
+use crate::snark::verifier_api::{verify_inside_snark, gen_srs};
 
 use super::report_elapsed;
 use super::signal::{Digest, Signal, C, F};
@@ -50,7 +50,8 @@ impl AccessSet {
             verifier_data.verifier_only.clone(),
             verifier_data.common.clone(),
         );
-        verify_inside_snark(proof);
+        let srs = gen_srs(23);
+        verify_inside_snark(proof, &srs);
         Ok(())
     }
 
@@ -63,13 +64,7 @@ impl AccessSet {
         let nullifier = PoseidonHash::hash_no_pad(&[private_key, topic].concat()).elements;
         let config = CircuitConfig {
             zero_knowledge: true,
-            num_wires: 135,
-            num_routed_wires: 80,
-            num_constants: 2,
-            use_base_arithmetic_gate: true,
-            security_bits: 100,
-            num_challenges: 2,
-            max_quotient_degree_factor: 8,
+            use_interpolation_gate: false,
             fri_config: FriConfig {
                 rate_bits: 3,
                 cap_height: 4,
@@ -77,6 +72,7 @@ impl AccessSet {
                 reduction_strategy: FriReductionStrategy::ConstantArityBits(1, 5), // 3, 5
                 num_query_rounds: 28,                                              // 28
             },
+            ..CircuitConfig::standard_recursion_config()
         };
         let mut builder = CircuitBuilder::new(config);
         let mut pw = PartialWitness::new();
@@ -106,13 +102,7 @@ impl AccessSet {
     ) -> Result<()> {
         let config = CircuitConfig {
             zero_knowledge: true,
-            num_wires: 135,
-            num_routed_wires: 80,
-            num_constants: 2,
-            use_base_arithmetic_gate: true,
-            security_bits: 100,
-            num_challenges: 2,
-            max_quotient_degree_factor: 8,
+            use_interpolation_gate: false,
             fri_config: FriConfig {
                 rate_bits: 3,
                 cap_height: 4,
@@ -120,6 +110,7 @@ impl AccessSet {
                 reduction_strategy: FriReductionStrategy::ConstantArityBits(3, 5), // 3, 5
                 num_query_rounds: 28,                                              // 28
             },
+            ..CircuitConfig::standard_recursion_config()
         };
 
         let mut builder = CircuitBuilder::new(config);
