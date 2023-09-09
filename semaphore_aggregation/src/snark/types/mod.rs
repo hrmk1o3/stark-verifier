@@ -82,7 +82,7 @@ impl<F: FieldExt> MerkleCapValues<F> {
             .0
             .iter()
             .map(|hash_value| HashValues::assign(config, layouter.namespace(|| ""), hash_value))
-            .collect::<Result<Vec<AssignedHashValues<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(AssignedMerkleCapValues(elements))
     }
 }

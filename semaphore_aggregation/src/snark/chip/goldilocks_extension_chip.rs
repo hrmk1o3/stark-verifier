@@ -73,6 +73,8 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
         z: &AssignedExtensionFieldValue<F, 2>,
     ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
         let goldilocks_chip = self.goldilocks_chip();
+        goldilocks_chip.assert_in_field(ctx, &y.0[0])?;
+        goldilocks_chip.assert_in_field(ctx, &y.0[1])?;
         let y_inv = y.0[0]
             .value()
             .zip(y.0[1].value())

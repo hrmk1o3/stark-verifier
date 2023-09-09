@@ -68,7 +68,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         if !value.is_asserted() {
             // XXX: Check range in the Goldilocks field as circuit.
             value
-                .value()
+                .value_unchecked()
                 .map(|v| {
                     assert!(
                         fe_to_big(*v) <= fe_to_big(-Goldilocks::from(1)),
@@ -555,6 +555,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         number_of_bits: usize,
     ) -> Result<Vec<AssignedCondition<F>>, Error> {
         assert!(number_of_bits <= F::NUM_BITS as usize);
+        self.assert_in_field(ctx, composed)?;
 
         let decomposed_value = composed.value().map(|value| {
             decompose(self.native_fe_to_goldilocks(*value), number_of_bits, 1)
@@ -605,6 +606,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         self.range_check(ctx, x, (64 - leading_zeros) as usize)
     } // OK
 
+    // NOTICE: Assume that `bits` is a little-endian bit representation of a value.
     pub fn from_bits(
         &self,
         ctx: &mut RegionCtx<'_, F>,

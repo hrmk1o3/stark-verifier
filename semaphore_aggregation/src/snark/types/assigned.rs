@@ -1,3 +1,4 @@
+use halo2_proofs::circuit::Value;
 use halo2curves::FieldExt;
 use halo2wrong_maingate::AssignedValue;
 
@@ -28,6 +29,16 @@ impl<F: FieldExt> AssignedFieldValue<F> {
 
     pub fn is_asserted(&self) -> bool {
         self.is_asserted.get()
+    }
+
+    pub fn value(&self) -> Value<&F> {
+        assert!(self.is_asserted());
+
+        self.value.value()
+    }
+
+    pub fn value_unchecked(&self) -> Value<&F> {
+        self.value.value()
     }
 }
 

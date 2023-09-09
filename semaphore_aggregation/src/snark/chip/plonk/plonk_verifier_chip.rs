@@ -224,12 +224,12 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
             0,
             0,
         ]);
-        let zeta_next = goldilocks_extension_chip.scalar_mul(ctx, &challenges.plonk_zeta, g)?; // XXX
+        let zeta_next = goldilocks_extension_chip.scalar_mul(ctx, &challenges.plonk_zeta, g)?;
         let fri_instance_info =
             FriInstanceInfo::new(&challenges.plonk_zeta, &zeta_next, common_data);
         let offset = self
             .goldilocks_chip()
-            .assign_constant(ctx, Goldilocks::multiplicative_generator())?; // XXX
+            .assign_constant(ctx, Goldilocks::multiplicative_generator())?;
         let fri_chip = FriVerifierChip::construct(
             &self.goldilocks_chip_config,
             spec.clone(),
