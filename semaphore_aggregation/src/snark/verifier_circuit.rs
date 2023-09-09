@@ -7,7 +7,7 @@ use halo2_proofs::{
 };
 use halo2curves::goldilocks::fp::Goldilocks;
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{AssignedValue, MainGate, MainGateConfig, MainGateInstructions};
+use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions};
 use itertools::Itertools;
 use poseidon::Spec;
 use std::marker::PhantomData;
@@ -87,7 +87,7 @@ impl Verifier {
                 let public_inputs = instances
                     .iter()
                     .map(|instance| goldilocks_chip.assign_value(ctx, Value::known(*instance)))
-                    .collect::<Result<Vec<AssignedValue<Fr>>, Error>>()?;
+                    .collect::<Result<Vec<_>, Error>>()?;
                 Ok(public_inputs)
             },
         )?;
@@ -207,7 +207,7 @@ impl Circuit<Fr> for Verifier {
         for (row, public_input) in
             (0..self.instances.len()).zip_eq(assigned_proof_with_pis.public_inputs)
         {
-            main_gate.expose_public(layouter.namespace(|| ""), public_input, row)?;
+            main_gate.expose_public(layouter.namespace(|| ""), (*public_input).clone(), row)?;
         }
         Ok(())
     }

@@ -2,14 +2,13 @@ use core::iter;
 use halo2_proofs::{arithmetic::Field, plonk::Error};
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
 use itertools::Itertools;
 
 use crate::snark::{
     chip::goldilocks_extension_chip::GoldilocksExtensionChip,
     chip::plonk::plonk_verifier_chip::PlonkVerifierChip,
     types::{
-        assigned::{AssignedExtensionFieldValue, AssignedHashValues},
+        assigned::{AssignedExtensionFieldValue, AssignedHashValues, AssignedFieldValue},
         common_data::CommonData,
     },
 };
@@ -57,9 +56,9 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
         next_zs: &[AssignedExtensionFieldValue<F, 2>],
         partial_products: &[AssignedExtensionFieldValue<F, 2>],
         s_sigmas: &[AssignedExtensionFieldValue<F, 2>],
-        betas: &[AssignedValue<F>],
-        gammas: &[AssignedValue<F>],
-        alphas: &[AssignedValue<F>],
+        betas: &[AssignedFieldValue<F>],
+        gammas: &[AssignedFieldValue<F>],
+        alphas: &[AssignedFieldValue<F>],
     ) -> Result<Vec<AssignedExtensionFieldValue<F, 2>>, Error> {
         let goldilocks_extension_chip = GoldilocksExtensionChip::new(&self.goldilocks_chip_config);
         let max_degree = common_data.quotient_degree_factor;

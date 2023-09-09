@@ -1,12 +1,11 @@
 use crate::snark::{
     chip::hasher_chip::HasherChip,
-    types::assigned::{AssignedExtensionFieldValue, AssignedHashValues, AssignedMerkleCapValues},
+    types::assigned::{AssignedExtensionFieldValue, AssignedHashValues, AssignedMerkleCapValues, AssignedFieldValue},
 };
 use halo2_proofs::arithmetic::FieldExt;
 use halo2_proofs::plonk::Error;
 use halo2curves::goldilocks::fp::Goldilocks;
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
 use poseidon::Spec;
 
 use super::goldilocks_chip::GoldilocksChipConfig;
@@ -33,7 +32,7 @@ impl<N: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     pub fn write_scalar(
         &mut self,
         ctx: &mut RegionCtx<'_, N>,
-        scalar: &AssignedValue<N>,
+        scalar: &AssignedFieldValue<N>,
     ) -> Result<(), Error> {
         self.hasher_chip.update(ctx, scalar)
     }
@@ -76,7 +75,7 @@ impl<N: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
         &mut self,
         ctx: &mut RegionCtx<'_, N>,
         num_outputs: usize,
-    ) -> Result<Vec<AssignedValue<N>>, Error> {
+    ) -> Result<Vec<AssignedFieldValue<N>>, Error> {
         self.hasher_chip.squeeze(ctx, num_outputs)
     }
 }

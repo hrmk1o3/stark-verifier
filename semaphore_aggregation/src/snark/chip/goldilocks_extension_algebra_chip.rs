@@ -6,7 +6,7 @@ use crate::snark::types::assigned::AssignedExtensionFieldValue;
 
 use super::{
     goldilocks_chip::GoldilocksChipConfig,
-    goldilocks_extension_chip::{self, GoldilocksExtensionChip},
+    goldilocks_extension_chip::GoldilocksExtensionChip,
 };
 
 #[derive(Clone, Debug)]

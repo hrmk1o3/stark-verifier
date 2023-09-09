@@ -1,7 +1,7 @@
-use halo2_proofs::{arithmetic::Field, plonk::Error, circuit::AssignedCell};
+use halo2_proofs::{arithmetic::Field, plonk::Error};
 use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{power_of_two, AssignedValue, Term};
+use halo2wrong_maingate::{power_of_two, AssignedValue, Term, AssignedCondition};
 use itertools::Itertools;
 use plonky2::util::reverse_index_bits_in_place;
 use poseidon::Spec;
@@ -10,7 +10,7 @@ use crate::snark::types::{
     assigned::{
         AssignedExtensionFieldValue, AssignedFriChallenges, AssignedFriInitialTreeProofValues,
         AssignedFriOpenings, AssignedFriProofValues, AssignedFriQueryRoundValues,
-        AssignedMerkleCapValues,
+        AssignedMerkleCapValues, AssignedFieldValue,
     },
     common_data::{FriParams, FriConfig},
     fri::{FriBatchInfo, FriInstanceInfo},
@@ -27,7 +27,7 @@ pub struct FriVerifierChip<F: FieldExt> {
     goldilocks_chip_config: GoldilocksChipConfig<F>,
     spec: Spec<Goldilocks, 12, 11>,
     /// Representative `g` of the coset used in FRI, so that LDEs in FRI are done over `gH`.
-    offset: AssignedValue<F>,
+    offset: AssignedFieldValue<F>,
     /// The degree of the purported codeword, measured in bits.
     fri_params: FriParams,
 }
@@ -36,7 +36,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
     pub fn construct(
         goldilocks_chip_config: &GoldilocksChipConfig<F>,
         spec: Spec<Goldilocks, 12, 11>,
-        offset: &AssignedValue<F>,
+        offset: &AssignedFieldValue<F>,
         fri_params: FriParams,
     ) -> Self {
         Self {
@@ -55,13 +55,13 @@ impl<F: FieldExt> FriVerifierChip<F> {
         GoldilocksExtensionChip::new(&self.goldilocks_chip_config)
     }
 
-    fn verify_proof_of_work(&self, ctx: &mut RegionCtx<'_, F>, fri_pow_response: &AssignedCell<F, F>, config: &FriConfig) {
+    fn verify_proof_of_work(&self, ctx: &mut RegionCtx<'_, F>, fri_pow_response: &AssignedFieldValue<F>, config: &FriConfig) -> Result<(), Error> {
         let goldilocks_chip = GoldilocksChip::new(&self.goldilocks_chip_config);
         goldilocks_chip.assert_leading_zeros(
             ctx,
             fri_pow_response,
             config.proof_of_work_bits + (64 - F::NUM_BITS) as u32,
-        );
+        )
     }
 
     fn compute_reduced_openings(
@@ -81,8 +81,8 @@ impl<F: FieldExt> FriVerifierChip<F> {
     fn calculate_cap_index(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x_index_bits: &[AssignedValue<F>],
-    ) -> Result<AssignedValue<F>, Error> {
+        x_index_bits: &[AssignedCondition<F>],
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let goldilocks_chip = self.goldilocks_chip();
         let terms = &x_index_bits[x_index_bits.len() - self.fri_params.config.cap_height..]
             .iter()
@@ -96,7 +96,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
     fn verify_initial_merkle_proof(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x_index_bits: &[AssignedValue<F>],
+        x_index_bits: &[AssignedCondition<F>],
         cap_index: &AssignedValue<F>,
         initial_merkle_caps: &[AssignedMerkleCapValues<F>],
         initial_trees_proof: &AssignedFriInitialTreeProofValues<F>,
@@ -127,7 +127,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
         fri_instance_info: &FriInstanceInfo<F, 2>,
         fri_alpha: &AssignedExtensionFieldValue<F, 2>,
         // `x` is the initially selected point in FRI
-        x: &AssignedValue<F>,
+        x: &AssignedFieldValue<F>,
         initial_trees_proof: &AssignedFriInitialTreeProofValues<F>,
         reduced_openings: &[AssignedExtensionFieldValue<F, 2>],
     ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
@@ -164,8 +164,8 @@ impl<F: FieldExt> FriVerifierChip<F> {
     fn x_from_subgroup(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x_index_bits: &[AssignedValue<F>],
-    ) -> Result<AssignedValue<F>, Error> {
+        x_index_bits: &[AssignedCondition<F>],
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let goldilocks_chip = self.goldilocks_chip();
         let lde_size = 1 << self.fri_params.lde_bits();
 
@@ -184,8 +184,8 @@ impl<F: FieldExt> FriVerifierChip<F> {
     fn next_eval(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x_index_within_coset_bits: &[AssignedValue<F>],
-        x: &AssignedValue<F>,
+        x_index_within_coset_bits: &[AssignedCondition<F>],
+        x: &AssignedFieldValue<F>,
         evals: &Vec<AssignedExtensionFieldValue<F, 2>>,
         arity_bits: usize,
         beta: &AssignedExtensionFieldValue<F, 2>,
@@ -254,7 +254,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
         fri_alpha: &AssignedExtensionFieldValue<F, 2>,
         fri_betas: &[AssignedExtensionFieldValue<F, 2>],
         fri_proof: &AssignedFriProofValues<F, 2>,
-        x_index: &AssignedValue<F>,
+        x_index: &AssignedFieldValue<F>,
         round_proof: &AssignedFriQueryRoundValues<F, 2>,
         reduced_openings: &[AssignedExtensionFieldValue<F, 2>],
     ) -> Result<(), Error> {
@@ -372,7 +372,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
         //     "Final polynomial has wrong degree."
         // );
 
-        self.verify_proof_of_work(ctx, &fri_challenges.fri_pow_response, &self.fri_params.config);
+        self.verify_proof_of_work(ctx, &fri_challenges.fri_pow_response, &self.fri_params.config)?;
 
         // // Check that parameters are coherent.
         // debug_assert_eq!(

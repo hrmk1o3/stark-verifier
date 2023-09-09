@@ -13,7 +13,6 @@ use halo2_proofs::circuit::Layouter;
 use halo2_proofs::plonk::Error;
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
 use itertools::Itertools;
 use plonky2::field::extension::quadratic::QuadraticExtension;
 use plonky2::field::polynomial::PolynomialCoeffs;
@@ -250,7 +249,7 @@ impl<F: FieldExt, const D: usize> FriQueryRoundValues<F, D> {
                             .map(|v| goldilocks_chip.assign_constant(ctx, *v))
                             .collect()
                     })
-                    .collect::<Result<Vec<Vec<AssignedValue<F>>>, Error>>()?;
+                    .collect::<Result<Vec<Vec<_>>, Error>>()?;
                 Ok(values)
             },
         )?;

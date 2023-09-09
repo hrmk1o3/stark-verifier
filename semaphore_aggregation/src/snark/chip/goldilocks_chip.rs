@@ -2,19 +2,21 @@ use std::marker::PhantomData;
 
 use halo2_proofs::{
     arithmetic::Field,
-    circuit::{AssignedCell, Value},
+    circuit::Value,
     plonk::Error,
 };
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{
-    big_to_fe, decompose, fe_to_big, power_of_two, AssignedCondition, AssignedValue,
+    big_to_fe, decompose, fe_to_big, power_of_two, AssignedCondition,
     CombinationOptionCommon, MainGate, MainGateConfig, MainGateInstructions, Term,
 };
 use itertools::Itertools;
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{Num, Zero};
+
+use crate::snark::types::assigned::AssignedFieldValue;
 
 // TODO : range check
 #[derive(Clone, Debug)]
@@ -63,16 +65,16 @@ impl<F: FieldExt> GoldilocksChip<F> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         unassigned: Value<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
-        main_gate.assign_value(ctx, unassigned)
+        Ok(main_gate.assign_value(ctx, unassigned)?.into())
     }
 
     pub fn assign_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
         constant: Goldilocks,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let constant: F = big_to_fe(fe_to_big::<Goldilocks>(constant));
         self.assign_value(ctx, Value::known(constant)) // XXX: fixed value になっていない
     }
@@ -81,9 +83,9 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn add(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        lhs: &AssignedValue<F>,
-        rhs: &AssignedValue<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+        lhs: &AssignedFieldValue<F>,
+        rhs: &AssignedFieldValue<F>,
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let (quotient, remainder) = lhs
@@ -106,16 +108,16 @@ impl<F: FieldExt> GoldilocksChip<F> {
                 F::zero(),
                 CombinationOptionCommon::OneLinerAdd.into(),
             )?
-            .swap_remove(3))
+            .swap_remove(3).into())
     }
 
     // XXX: Check range in the Goldilocks field.
     pub fn sub(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        lhs: &AssignedValue<F>,
-        rhs: &AssignedValue<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+        lhs: &AssignedFieldValue<F>,
+        rhs: &AssignedFieldValue<F>,
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let (quotient, remainder) = lhs
@@ -140,16 +142,16 @@ impl<F: FieldExt> GoldilocksChip<F> {
                 F::zero(),
                 CombinationOptionCommon::OneLinerAdd.into(),
             )?
-            .swap_remove(4))
+            .swap_remove(4).into())
     }
 
     // XXX: Check range in the Goldilocks field.
     pub fn mul(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        lhs: &AssignedValue<F>,
-        rhs: &AssignedValue<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+        lhs: &AssignedFieldValue<F>,
+        rhs: &AssignedFieldValue<F>,
+    ) -> Result<AssignedFieldValue<F>, Error> {
         self.mul_with_constant(ctx, lhs, rhs, Goldilocks::one())
     }
 
@@ -159,10 +161,10 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn mul_with_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        lhs: &AssignedValue<F>,
-        rhs: &AssignedValue<F>,
+        lhs: &AssignedFieldValue<F>,
+        rhs: &AssignedFieldValue<F>,
         constant: Goldilocks,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let constant = self.goldilocks_to_native_fe(constant);
@@ -187,17 +189,17 @@ impl<F: FieldExt> GoldilocksChip<F> {
                 F::zero(),
                 CombinationOptionCommon::CombineToNextScaleMul(F::zero(), constant).into(),
             )?
-            .swap_remove(3))
+            .swap_remove(3).into())
     }
 
     // XXX: Check range in the Goldilocks field.
     pub fn mul_add_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
-        b: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
+        b: &AssignedFieldValue<F>,
         to_add: Goldilocks,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let to_add = self.goldilocks_to_native_fe(to_add);
@@ -223,16 +225,16 @@ impl<F: FieldExt> GoldilocksChip<F> {
                 F::zero(),
                 CombinationOptionCommon::OneLinerMul.into(),
             )?
-            .swap_remove(4))
+            .swap_remove(4).into())
     }
 
     // XXX: Check range in the Goldilocks field.
     pub fn add_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
         constant: Goldilocks,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let (quotient, remainder) = a
@@ -255,7 +257,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
                 F::zero(),
                 CombinationOptionCommon::OneLinerAdd.into(),
             )?
-            .swap_remove(3))
+            .swap_remove(3).into())
     }
 
     /// This function checks if `lhs` is the same as `rhs` in `F` (not the Goldilocks field).
@@ -263,8 +265,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn assert_equal(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        lhs: &AssignedValue<F>,
-        rhs: &AssignedValue<F>,
+        lhs: &AssignedFieldValue<F>,
+        rhs: &AssignedFieldValue<F>,
     ) -> Result<(), Error> {
         let main_gate = self.main_gate();
         let lhs_minus_rhs = self.sub(ctx, lhs, rhs)?;
@@ -274,7 +276,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn assert_one(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
     ) -> Result<(), Error> {
         let one = self.assign_constant(ctx, Goldilocks::one())?;
         self.assert_equal(ctx, a, &one)
@@ -283,7 +285,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn assert_zero(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
     ) -> Result<(), Error> {
         let zero = self.assign_constant(ctx, Goldilocks::zero())?;
         self.assert_equal(ctx, a, &zero)
@@ -296,7 +298,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         ctx: &mut RegionCtx<'_, F>,
         terms: &[Term<F>],
         constant: Goldilocks,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         assert!(!terms.is_empty(), "At least one term is expected");
         let goldilocks_modulus = self.goldilocks_modulus();
         let composed = terms.iter().fold(
@@ -318,7 +320,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         bit: Value<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedCondition<F>, Error> {
         let main_gate = self.main_gate();
         main_gate.assign_bit(ctx, bit)
     }
@@ -330,8 +332,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn invert(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
-    ) -> Result<(AssignedValue<F>, AssignedCondition<F>), Error> {
+        a: &AssignedFieldValue<F>,
+    ) -> Result<(AssignedFieldValue<F>, AssignedCondition<F>), Error> {
         let main_gate = self.main_gate();
         let goldilocks_modulus = self.goldilocks_modulus();
         let (one, zero) = (Goldilocks::one(), Goldilocks::zero());
@@ -408,7 +410,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             CombinationOptionCommon::OneLinerMul.into(),
         )?;
 
-        Ok((a_inv, r))
+        Ok((a_inv.into(), r))
     }
 
     // NOTICE: Assume `a` and `b` are in the Goldilocks field.
@@ -416,18 +418,18 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn select(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
-        b: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
+        b: &AssignedFieldValue<F>,
         cond: &AssignedCondition<F>,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
-        main_gate.select(ctx, a, b, cond)
+        Ok(main_gate.select(ctx, &a, &b, cond)?.into())
     }
 
     pub fn is_zero(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
     ) -> Result<AssignedCondition<F>, Error> {
         let (_, is_zero) = self.invert(ctx, a)?;
         Ok(is_zero)
@@ -438,7 +440,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn to_bits(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        composed: &AssignedValue<F>,
+        composed: &AssignedFieldValue<F>,
         number_of_bits: usize,
     ) -> Result<Vec<AssignedCondition<F>>, Error> {
         assert!(number_of_bits <= F::NUM_BITS as usize);
@@ -474,7 +476,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn range_check(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x: &AssignedCell<F, F>,
+        x: &AssignedFieldValue<F>,
         n_log: usize,
     ) -> Result<(), Error> {
         let _ = self.to_bits(ctx, x, n_log as usize)?;
@@ -486,7 +488,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub(crate) fn assert_leading_zeros(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        x: &AssignedCell<F, F>,
+        x: &AssignedFieldValue<F>,
         leading_zeros: u32,
     ) -> Result<(), Error> {
         self.range_check(ctx, x, (64 - leading_zeros) as usize)
@@ -495,8 +497,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn from_bits(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        bits: &Vec<AssignedValue<F>>,
-    ) -> Result<AssignedValue<F>, Error> {
+        bits: &Vec<AssignedCondition<F>>,
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let terms = bits
             .iter()
             .enumerate()
@@ -508,9 +510,9 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn exp_power_of_2(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
         power_log: usize,
-    ) -> Result<AssignedValue<F>, Error> {
+    ) -> Result<AssignedFieldValue<F>, Error> {
         let mut result = a.clone();
         for _ in 0..power_log {
             result = self.mul(ctx, &result, &result)?;
@@ -522,12 +524,13 @@ impl<F: FieldExt> GoldilocksChip<F> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         base: Goldilocks,
-        power_bits: &[AssignedValue<F>],
-    ) -> Result<AssignedValue<F>, Error> {
-        let mut x = self.assign_constant(ctx, Goldilocks::one())?;
-        let one = self.assign_constant(ctx, Goldilocks::one())?;
+        power_bits: &[AssignedCondition<F>],
+    ) -> Result<AssignedFieldValue<F>, Error> {
+        let main_gate = self.main_gate();
+        let mut x = self.assign_constant(ctx, Goldilocks::one())?.into();
+        let one = self.assign_constant(ctx, Goldilocks::one())?.into();
         for (i, bit) in power_bits.iter().enumerate() {
-            let is_zero_bit = self.is_zero(ctx, bit)?;
+            let is_zero_bit = main_gate.is_zero(ctx, bit)?;
 
             let power = u64::from(1u64 << i).to_le();
             let base = self.assign_constant(ctx, base.pow(&[power, 0, 0, 0]))?;
@@ -540,8 +543,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
     pub fn is_equal(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedValue<F>,
-        b: &AssignedValue<F>,
+        a: &AssignedFieldValue<F>,
+        b: &AssignedFieldValue<F>,
     ) -> Result<AssignedCondition<F>, Error> {
         let a_mimus_b = self.sub(ctx, a, b)?;
         self.is_zero(ctx, &a_mimus_b)
@@ -550,6 +553,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
+
     use halo2_proofs::{
         circuit::{floor_planner::V1, *},
         dev::MockProver,
@@ -557,7 +562,6 @@ mod tests {
         plonk::*,
     };
     use halo2curves::group::ff::PrimeField;
-    use halo2wrong_maingate::compose;
 
     use crate::snark::verifier_circuit::MainGateWithRangeConfig;
 
@@ -630,7 +634,7 @@ mod tests {
                 },
             )?;
 
-            main_gate.expose_public(layouter, c_assigned, 0)?;
+            main_gate.expose_public(layouter, (*c_assigned).clone(), 0)?;
 
             Ok(())
         }
@@ -711,13 +715,13 @@ mod tests {
                     let goldilocks_chip = GoldilocksChip::new(&goldilocks_chip_config);
                     let a_assigned = goldilocks_chip.assign_value(ctx, a)?;
                     let decomposed_a_assigned = goldilocks_chip.to_bits(ctx, &a_assigned, NUM_BITS)?;
-                    goldilocks_chip.assert_one(ctx, &decomposed_a_assigned[63])?;
+                    main_gate.assert_one(ctx, &decomposed_a_assigned[63])?;
 
                     Ok(a_assigned)
                 },
             )?;
 
-            main_gate.expose_public(layouter, a_assigned, 0)?;
+            main_gate.expose_public(layouter, (*a_assigned).clone(), 0)?;
 
             Ok(())
         }

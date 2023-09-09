@@ -3,14 +3,63 @@ use halo2wrong_maingate::AssignedValue;
 
 #[derive(Clone)]
 pub struct AssignedHashValues<F: FieldExt> {
-    pub elements: [AssignedValue<F>; 4],
+    pub elements: [AssignedFieldValue<F>; 4],
 }
 
 #[derive(Clone)]
 pub struct AssignedMerkleCapValues<F: FieldExt>(pub Vec<AssignedHashValues<F>>);
 
 #[derive(Clone, Debug)]
-pub struct AssignedExtensionFieldValue<F: FieldExt, const D: usize>(pub [AssignedValue<F>; D]);
+pub struct AssignedFieldValue<F: FieldExt>(AssignedValue<F>);
+
+impl<F: FieldExt> From<AssignedValue<F>> for AssignedFieldValue<F> {
+    fn from(value: AssignedValue<F>) -> Self {
+        Self(value)
+    }
+}
+
+impl<F: FieldExt> std::ops::Deref for AssignedFieldValue<F> {
+    type Target = AssignedValue<F>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<F: FieldExt> std::ops::DerefMut for AssignedFieldValue<F> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<F: FieldExt> AsRef<AssignedValue<F>> for AssignedFieldValue<F> {
+    fn as_ref(&self) -> &AssignedValue<F> {
+        &self.0
+    }
+}
+
+impl<F: FieldExt> AsMut<AssignedValue<F>> for AssignedFieldValue<F> {
+    fn as_mut(&mut self) -> &mut AssignedValue<F> {
+        &mut self.0
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AssignedExtensionFieldValue<F: FieldExt, const D: usize>(pub [AssignedFieldValue<F>; D]);
+
+impl<F: FieldExt, const D: usize> From<[AssignedFieldValue<F>; D]> for AssignedExtensionFieldValue<F, D> {
+    fn from(value: [AssignedFieldValue<F>; D]) -> Self {
+        Self(value)
+    }
+}
+
+impl<F: FieldExt, const D: usize> std::ops::Deref for AssignedExtensionFieldValue<F, D> {
+    type Target = [AssignedFieldValue<F>; D];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub struct AssignedOpeningSetValues<F: FieldExt, const D: usize> {
     pub constants: Vec<AssignedExtensionFieldValue<F, D>>,
@@ -51,7 +100,7 @@ pub struct AssignedMerkleProofValues<F: FieldExt> {
 
 #[derive(Clone)]
 pub struct AssignedFriInitialTreeProofValues<F: FieldExt> {
-    pub evals_proofs: Vec<(Vec<AssignedValue<F>>, AssignedMerkleProofValues<F>)>,
+    pub evals_proofs: Vec<(Vec<AssignedFieldValue<F>>, AssignedMerkleProofValues<F>)>,
 }
 
 impl<F: FieldExt> AssignedFriInitialTreeProofValues<F> {
@@ -60,11 +109,11 @@ impl<F: FieldExt> AssignedFriInitialTreeProofValues<F> {
         oracle_index: usize,
         poly_index: usize,
         salted: bool,
-    ) -> AssignedValue<F> {
+    ) -> AssignedFieldValue<F> {
         self.unsalted_evals(oracle_index, salted)[poly_index].clone()
     }
 
-    fn unsalted_evals(&self, oracle_index: usize, salted: bool) -> &[AssignedValue<F>] {
+    fn unsalted_evals(&self, oracle_index: usize, salted: bool) -> &[AssignedFieldValue<F>] {
         let evals = &self.evals_proofs[oracle_index].0;
         let salt_size = if salted { 4 } else { 0 };
         &evals[..evals.len() - salt_size]
@@ -93,7 +142,7 @@ pub struct AssignedFriProofValues<F: FieldExt, const D: usize> {
     pub commit_phase_merkle_cap_values: Vec<AssignedMerkleCapValues<F>>,
     pub query_round_proofs: Vec<AssignedFriQueryRoundValues<F, D>>,
     pub final_poly: AssignedPolynomialCoeffsExtValues<F, D>,
-    pub pow_witness: AssignedValue<F>,
+    pub pow_witness: AssignedFieldValue<F>,
 }
 
 pub struct AssignedProofValues<F: FieldExt, const D: usize> {
@@ -107,7 +156,7 @@ pub struct AssignedProofValues<F: FieldExt, const D: usize> {
 
 pub struct AssignedProofWithPisValues<F: FieldExt, const D: usize> {
     pub proof: AssignedProofValues<F, D>,
-    pub public_inputs: Vec<AssignedValue<F>>,
+    pub public_inputs: Vec<AssignedFieldValue<F>>,
 }
 
 pub struct AssignedVerificationKeyValues<F: FieldExt> {
@@ -119,8 +168,8 @@ pub struct AssignedVerificationKeyValues<F: FieldExt> {
 pub struct AssignedFriChallenges<F: FieldExt, const D: usize> {
     pub fri_alpha: AssignedExtensionFieldValue<F, D>,
     pub fri_betas: Vec<AssignedExtensionFieldValue<F, D>>,
-    pub fri_pow_response: AssignedValue<F>,
-    pub fri_query_indices: Vec<AssignedValue<F>>,
+    pub fri_pow_response: AssignedFieldValue<F>,
+    pub fri_query_indices: Vec<AssignedFieldValue<F>>,
 }
 
 /// Opened values of each polynomial.
@@ -134,9 +183,9 @@ pub struct AssignedFriOpeningBatch<F: FieldExt, const D: usize> {
 }
 
 pub struct AssignedProofChallenges<F: FieldExt, const D: usize> {
-    pub plonk_betas: Vec<AssignedValue<F>>,
-    pub plonk_gammas: Vec<AssignedValue<F>>,
-    pub plonk_alphas: Vec<AssignedValue<F>>,
+    pub plonk_betas: Vec<AssignedFieldValue<F>>,
+    pub plonk_gammas: Vec<AssignedFieldValue<F>>,
+    pub plonk_alphas: Vec<AssignedFieldValue<F>>,
     pub plonk_zeta: AssignedExtensionFieldValue<F, D>,
     pub fri_challenges: AssignedFriChallenges<F, D>,
 }

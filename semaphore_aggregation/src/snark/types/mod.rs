@@ -5,7 +5,6 @@ use halo2_proofs::circuit::Layouter;
 use halo2_proofs::plonk::Error;
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
 use plonky2::field::extension::Extendable;
 use plonky2::{
     field::goldilocks_field::GoldilocksField,
@@ -47,7 +46,7 @@ impl<F: FieldExt> HashValues<F> {
                     .elements
                     .iter()
                     .map(|e| goldilocks_chip.assign_constant(ctx, *e))
-                    .collect::<Result<Vec<AssignedValue<F>>, Error>>()
+                    .collect::<Result<Vec<_>, Error>>()
                     .unwrap()
                     .try_into()
                     .unwrap();
@@ -126,7 +125,7 @@ impl<F: FieldExt, const D: usize> ExtensionFieldValue<F, D> {
                     .elements
                     .iter()
                     .map(|v| goldilocks_chip.assign_constant(ctx, *v))
-                    .collect::<Result<Vec<AssignedValue<F>>, Error>>()?
+                    .collect::<Result<Vec<_>, Error>>()?
                     .try_into()
                     .unwrap();
                 Ok(AssignedExtensionFieldValue(elements))

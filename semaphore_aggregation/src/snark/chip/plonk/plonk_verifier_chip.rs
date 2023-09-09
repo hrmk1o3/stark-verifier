@@ -9,7 +9,7 @@ use crate::snark::{
         assigned::{
             AssignedExtensionFieldValue, AssignedFriChallenges, AssignedFriProofValues,
             AssignedHashValues, AssignedProofChallenges, AssignedProofValues,
-            AssignedVerificationKeyValues,
+            AssignedVerificationKeyValues, AssignedFieldValue,
         },
         common_data::CommonData,
         fri::FriInstanceInfo,
@@ -19,7 +19,6 @@ use crate::snark::{
 use halo2_proofs::plonk::*;
 use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
 use poseidon::Spec;
 
 pub struct PlonkVerifierChip<F: FieldExt> {
@@ -40,7 +39,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
     pub fn get_public_inputs_hash(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        public_inputs: &Vec<AssignedValue<F>>,
+        public_inputs: &Vec<AssignedFieldValue<F>>,
         spec: &Spec<Goldilocks, 12, 11>,
     ) -> Result<AssignedHashValues<F>, Error> {
         let mut hasher_chip =
@@ -126,7 +125,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
                 let fri_beta = transcript_chip.squeeze(ctx, 2)?;
                 Ok(AssignedExtensionFieldValue(fri_beta.try_into().unwrap()))
             })
-            .collect::<Result<Vec<AssignedExtensionFieldValue<F, 2>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
 
         for ext in final_poly.0.iter() {
             for e in ext.0.iter() {

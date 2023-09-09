@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use halo2_proofs::plonk::Error;
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::AssignedValue;
+use halo2wrong_maingate::{AssignedValue, AssignedCondition};
 use itertools::Itertools;
 use poseidon::Spec;
 
-use crate::snark::types::assigned::{AssignedMerkleCapValues, AssignedMerkleProofValues};
+use crate::snark::types::assigned::{AssignedMerkleCapValues, AssignedMerkleProofValues, AssignedFieldValue};
 
 use super::{
     goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
@@ -44,8 +44,8 @@ impl<F: FieldExt> MerkleProofChip<F> {
     pub fn verify_merkle_proof_to_cap_with_cap_index(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        leaf_data: &Vec<AssignedValue<F>>,
-        leaf_index_bits: &[AssignedValue<F>],
+        leaf_data: &Vec<AssignedFieldValue<F>>,
+        leaf_index_bits: &[AssignedCondition<F>],
         cap_index: &AssignedValue<F>,
         merkle_cap: &AssignedMerkleCapValues<F>,
         proof: &AssignedMerkleProofValues<F>,

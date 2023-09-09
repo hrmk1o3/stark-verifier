@@ -3,9 +3,9 @@ use halo2_proofs::plonk::Error;
 use halo2curves::goldilocks::fp2::QuadraticExtension;
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{big_to_fe, fe_to_big, AssignedValue};
+use halo2wrong_maingate::{big_to_fe, fe_to_big};
 
-use crate::snark::types::assigned::AssignedExtensionFieldValue;
+use crate::snark::types::assigned::{AssignedExtensionFieldValue, AssignedFieldValue};
 
 use super::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
 
@@ -122,7 +122,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
             .iter()
             .zip(addend_1.0.iter())
             .map(|(addend_0, addend_1)| goldilocks_chip.add(ctx, addend_0, addend_1))
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(AssignedExtensionFieldValue(added.try_into().unwrap()))
     }
 
@@ -138,7 +138,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
             .0
             .iter()
             .map(|v| goldilocks_chip.mul(ctx, v, &assigned_scalar))
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(AssignedExtensionFieldValue(multiplied.try_into().unwrap()))
     }
 
@@ -168,7 +168,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
         let goldilocks_chip = self.goldilocks_chip();
         let elements = (0..2)
             .map(|_| goldilocks_chip.assign_constant(ctx, Goldilocks::zero()))
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(AssignedExtensionFieldValue(elements.try_into().unwrap()))
     }
 
@@ -181,7 +181,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
             goldilocks_chip.assign_constant(ctx, Goldilocks::one())?,
             goldilocks_chip.assign_constant(ctx, Goldilocks::zero())?,
         ];
-        Ok(AssignedExtensionFieldValue(elements))
+        Ok(elements.into())
     }
 
     pub fn two_extension(
@@ -314,22 +314,27 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
     ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
         let goldilocks_chip = self.goldilocks_chip();
         let elements = constant
-            .into_iter()
+            .iter()
             .map(|c| goldilocks_chip.assign_constant(ctx, *c))
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
         Ok(AssignedExtensionFieldValue(elements.try_into().unwrap()))
     }
 
-    pub fn convert_to_extension(
+    pub fn convert_to_extension<const D: usize>(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        value: &AssignedValue<F>,
-    ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
+        value: &AssignedFieldValue<F>,
+    ) -> Result<AssignedExtensionFieldValue<F, D>, Error> {
         let goldilocks_chip = self.goldilocks_chip();
-        Ok(AssignedExtensionFieldValue([
+        let mut raw = vec![
             value.clone(),
-            goldilocks_chip.assign_constant(ctx, Goldilocks::zero())?,
-        ]))
+        ];
+        let zero = goldilocks_chip.assign_constant(ctx, Goldilocks::zero())?;
+        for _ in 1..D {
+            raw.push(zero.clone());
+        }
+
+        Ok(AssignedExtensionFieldValue(raw.try_into().unwrap()))
     }
 
     pub fn reduce_extension(
@@ -349,7 +354,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         base: &AssignedExtensionFieldValue<F, 2>,
-        terms: &Vec<AssignedValue<F>>,
+        terms: &Vec<AssignedFieldValue<F>>,
     ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
         let terms = terms
             .iter()
@@ -361,7 +366,7 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
     pub fn reduce_extension_field_terms_base(
         &self,
         ctx: &mut RegionCtx<'_, F>,
-        base: &AssignedValue<F>,
+        base: &AssignedFieldValue<F>,
         terms: &Vec<AssignedExtensionFieldValue<F, 2>>,
     ) -> Result<AssignedExtensionFieldValue<F, 2>, Error> {
         let base = self.convert_to_extension(ctx, base)?;

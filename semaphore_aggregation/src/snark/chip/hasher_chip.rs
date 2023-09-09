@@ -3,22 +3,24 @@ use halo2_proofs::{
     plonk::Error,
 };
 use halo2curves::goldilocks::fp::Goldilocks;
-use halo2wrong_maingate::{AssignedValue, RegionCtx, Term};
+use halo2wrong_maingate::{RegionCtx, Term};
 use poseidon::{SparseMDSMatrix, Spec, State};
+
+use crate::snark::types::assigned::AssignedFieldValue;
 
 use super::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
 
 /// `AssignedState` is composed of `T` sized assigned values
 #[derive(Debug, Clone)]
-pub struct AssignedState<F: FieldExt, const T: usize>(pub(super) [AssignedValue<F>; T]);
+pub struct AssignedState<F: FieldExt, const T: usize>(pub(super) [AssignedFieldValue<F>; T]);
 
 /// `HasherChip` is basically responsible for contraining permutation part of
 /// transcript pipeline
 #[derive(Debug, Clone)]
 pub struct HasherChip<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize> {
     state: AssignedState<F, T>,
-    absorbing: Vec<AssignedValue<F>>,
-    output_buffer: Vec<AssignedValue<F>>,
+    absorbing: Vec<AssignedFieldValue<F>>,
+    output_buffer: Vec<AssignedFieldValue<F>>,
     spec: Spec<Goldilocks, T, T_MINUS_ONE>,
     goldilocks_chip_config: GoldilocksChipConfig<F>,
 }
@@ -39,7 +41,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
             .words()
             .iter()
             .map(|word| goldilocks_chip.assign_constant(ctx, *word))
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
 
         Ok(Self {
             state: AssignedState(initial_state.try_into().unwrap()),
@@ -55,7 +57,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     pub fn update(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
-        element: &AssignedValue<F>,
+        element: &AssignedFieldValue<F>,
     ) -> Result<(), Error> {
         self.output_buffer.clear();
         self.absorbing.push(element.clone());
@@ -78,7 +80,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
         num_outputs: usize,
-    ) -> Result<Vec<AssignedValue<F>>, Error> {
+    ) -> Result<Vec<AssignedFieldValue<F>>, Error> {
         let mut output = vec![];
         for _i in 0..num_outputs {
             self.absorb_buffered_inputs(ctx)?;
@@ -206,7 +208,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
 
                 goldilocks_chip.compose(ctx, &terms[..], Goldilocks::zero())
             })
-            .collect::<Result<Vec<AssignedValue<F>>, Error>>()?;
+            .collect::<Result<Vec<_>, Error>>()?;
 
         // Assign new state
         for (word, new_word) in self.state.0.iter_mut().zip(new_state.into_iter()) {
@@ -298,7 +300,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     fn duplexing(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
-        input: &[AssignedValue<F>],
+        input: &[AssignedFieldValue<F>],
     ) -> Result<(), Error> {
         for (word, input) in self.state.0.iter_mut().zip(input.iter()) {
             *word = input.clone();
@@ -313,9 +315,9 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     pub fn hash(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
-        inputs: Vec<AssignedValue<F>>,
+        inputs: Vec<AssignedFieldValue<F>>,
         num_outputs: usize,
-    ) -> Result<Vec<AssignedValue<F>>, Error> {
+    ) -> Result<Vec<AssignedFieldValue<F>>, Error> {
         // Flush the input que
         self.absorbing.clear();
 
@@ -341,9 +343,9 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     pub fn permute(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
-        input: Vec<AssignedValue<F>>,
+        input: Vec<AssignedFieldValue<F>>,
         num_output: usize,
-    ) -> Result<Vec<AssignedValue<F>>, Error> {
+    ) -> Result<Vec<AssignedFieldValue<F>>, Error> {
         for (word, input) in self.state.0.iter_mut().zip(input.iter()) {
             *word = input.clone();
         }

@@ -3,46 +3,48 @@ use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::AssignedValue;
 
+use crate::snark::types::assigned::AssignedFieldValue;
+
 use super::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
 
 pub struct VectorChip<F: FieldExt> {
-    main_gate_config: GoldilocksChipConfig<F>,
-    vector: Vec<AssignedValue<F>>,
+    goldilocks_chip_config: GoldilocksChipConfig<F>,
+    vector: Vec<AssignedFieldValue<F>>,
 }
 
 impl<F: FieldExt> VectorChip<F> {
-    pub fn new(main_gate_config: &GoldilocksChipConfig<F>, vector: Vec<AssignedValue<F>>) -> Self {
+    pub fn new(goldilocks_chip_config: &GoldilocksChipConfig<F>, vector: Vec<AssignedFieldValue<F>>) -> Self {
         Self {
-            main_gate_config: main_gate_config.clone(),
+            goldilocks_chip_config: goldilocks_chip_config.clone(),
             vector,
         }
     }
 
-    fn main_gate(&self) -> GoldilocksChip<F> {
-        GoldilocksChip::new(&self.main_gate_config)
+    fn goldilocks_chip(&self) -> GoldilocksChip<F> {
+        GoldilocksChip::new(&self.goldilocks_chip_config)
     }
 
     pub fn access(
         &self,
         ctx: &mut RegionCtx<'_, F>,
         index: &AssignedValue<F>,
-    ) -> Result<AssignedValue<F>, Error> {
-        let main_gate = self.main_gate();
+    ) -> Result<AssignedFieldValue<F>, Error> {
+        let goldilocks_chip = self.goldilocks_chip();
         // this value will be used to check whether the index is in the bound
-        let mut not_exists = main_gate.assign_constant(ctx, Goldilocks::one())?;
+        let mut not_exists = goldilocks_chip.assign_constant(ctx, Goldilocks::one())?;
 
-        let zero = main_gate.assign_constant(ctx, Goldilocks::zero())?;
+        let zero = goldilocks_chip.assign_constant(ctx, Goldilocks::zero())?;
         let mut element = zero.clone();
         for (i, v) in self.vector.iter().enumerate() {
-            let assigned_i = main_gate.assign_constant(ctx, Goldilocks(i as u64))?;
-            let i_minus_index = main_gate.sub(ctx, &assigned_i, index)?;
-            not_exists = main_gate.mul(ctx, &not_exists, &i_minus_index)?;
+            let assigned_i = goldilocks_chip.assign_constant(ctx, Goldilocks(i as u64))?;
+            let i_minus_index = goldilocks_chip.sub(ctx, &assigned_i, &index.clone().into())?;
+            not_exists = goldilocks_chip.mul(ctx, &not_exists, &i_minus_index)?;
 
-            let is_same_index = main_gate.is_equal(ctx, &i_minus_index, &zero)?;
-            element = main_gate.select(ctx, v, &element, &is_same_index)?;
+            let is_same_index = goldilocks_chip.is_equal(ctx, &i_minus_index, &zero)?;
+            element = goldilocks_chip.select(ctx, v, &element, &is_same_index)?;
         }
         // if this fails, index is out of the bound, and will return error
-        main_gate.assert_zero(ctx, &not_exists)?;
+        goldilocks_chip.assert_zero(ctx, &not_exists)?;
         Ok(element)
     }
 }
