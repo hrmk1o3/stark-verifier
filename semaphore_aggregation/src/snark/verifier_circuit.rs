@@ -7,7 +7,7 @@ use halo2_proofs::{
 };
 use halo2curves::goldilocks::fp::Goldilocks;
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions};
+use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions, big_to_fe, fe_to_big};
 use itertools::Itertools;
 use poseidon::Spec;
 use std::marker::PhantomData;
@@ -83,11 +83,17 @@ impl Verifier {
             |region| {
                 let ctx = &mut RegionCtx::new(region, 0);
                 let goldilocks_chip = GoldilocksChip::new(config);
+                let max = fe_to_big(-Goldilocks::from(1));
 
                 let public_inputs = instances
                     .iter()
-                    .map(|instance| goldilocks_chip.assign_value(ctx, Value::known(*instance)))
+                    .map(|instance| goldilocks_chip.assign_value(ctx, {
+                        assert!(fe_to_big(*instance) <= max);
+
+                        Value::known(big_to_fe(fe_to_big(*instance)))
+                    }))
                     .collect::<Result<Vec<_>, Error>>()?;
+
                 Ok(public_inputs)
             },
         )?;

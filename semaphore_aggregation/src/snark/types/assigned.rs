@@ -18,6 +18,16 @@ impl<F: FieldExt> From<AssignedValue<F>> for AssignedFieldValue<F> {
     }
 }
 
+impl<F: FieldExt> AssignedFieldValue<F> {
+    pub fn asserted(value: AssignedValue<F>) -> Self {
+        Self(value)
+    }
+
+    pub fn is_asserted() -> bool {
+        true
+    }
+}
+
 impl<F: FieldExt> std::ops::Deref for AssignedFieldValue<F> {
     type Target = AssignedValue<F>;
 

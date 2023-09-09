@@ -83,8 +83,8 @@ impl<F: FieldExt> GoldilocksExtensionChip<F> {
                 ])
                 .invert()
                 .unwrap()
-                .0
-                .map(|v| self.goldilocks_to_native_fe(v));
+                .0;
+
                 (y_inv[0], y_inv[1])
             })
             .unzip();

@@ -1,7 +1,7 @@
 use halo2_proofs::{arithmetic::Field, plonk::Error};
 use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{power_of_two, AssignedValue, Term, AssignedCondition};
+use halo2wrong_maingate::{power_of_two, Term, AssignedCondition};
 use itertools::Itertools;
 use plonky2::util::reverse_index_bits_in_place;
 use poseidon::Spec;
@@ -97,7 +97,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
         &self,
         ctx: &mut RegionCtx<'_, F>,
         x_index_bits: &[AssignedCondition<F>],
-        cap_index: &AssignedValue<F>,
+        cap_index: &AssignedFieldValue<F>,
         initial_merkle_caps: &[AssignedMerkleCapValues<F>],
         initial_trees_proof: &AssignedFriInitialTreeProofValues<F>,
     ) -> Result<(), Error> {

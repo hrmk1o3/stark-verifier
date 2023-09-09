@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use halo2_proofs::plonk::Error;
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
-use halo2wrong_maingate::{AssignedValue, AssignedCondition};
+use halo2wrong_maingate::AssignedCondition;
 use itertools::Itertools;
 use poseidon::Spec;
 
@@ -46,7 +46,7 @@ impl<F: FieldExt> MerkleProofChip<F> {
         ctx: &mut RegionCtx<'_, F>,
         leaf_data: &Vec<AssignedFieldValue<F>>,
         leaf_index_bits: &[AssignedCondition<F>],
-        cap_index: &AssignedValue<F>,
+        cap_index: &AssignedFieldValue<F>,
         merkle_cap: &AssignedMerkleCapValues<F>,
         proof: &AssignedMerkleProofValues<F>,
     ) -> Result<(), Error> {
