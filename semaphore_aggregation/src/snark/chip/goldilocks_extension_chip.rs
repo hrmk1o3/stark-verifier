@@ -9,8 +9,6 @@ use crate::snark::types::assigned::AssignedExtensionFieldValue;
 
 use super::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
 
-pub struct AssignedExtensionAlgebra<F: FieldExt>(pub [AssignedExtensionFieldValue<F, 2>; 2]);
-
 pub struct GoldilocksExtensionChip<F: FieldExt> {
     goldilocks_chip_config: GoldilocksChipConfig<F>,
 }

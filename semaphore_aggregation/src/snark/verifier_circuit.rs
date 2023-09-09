@@ -31,7 +31,7 @@ use super::{
 
 #[derive(Clone)]
 pub struct MainGateWithRangeConfig<F: FieldExt> {
-    main_gate_config: MainGateConfig,
+    pub main_gate_config: MainGateConfig,
     _marker: PhantomData<F>,
 }
 

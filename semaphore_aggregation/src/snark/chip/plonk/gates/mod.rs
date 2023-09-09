@@ -107,9 +107,9 @@ pub trait CustomGateConstrainer<F: FieldExt>: CustomGateConstrainerClone<F> {
                 goldilocks_extension_chip.sub_extension(ctx, &k, &f_zeta)
             })
             .collect::<Result<Vec<AssignedExtensionFieldValue<F, 2>>, Error>>()?;
-        let filter = goldilocks_extension_chip.mul_many_extension(ctx, terms)?;
+        let filter = goldilocks_extension_chip.mul_many_extension(ctx, terms)?; // compute_filter_circuit
 
-        local_constants = &local_constants[num_selectors..];
+        local_constants = &local_constants[num_selectors..]; // remove_prefix
         let gate_constraints = self.eval_unfiltered_constraint(
             ctx,
             goldilocks_chip_config,
@@ -121,7 +121,7 @@ pub trait CustomGateConstrainer<F: FieldExt>: CustomGateConstrainerClone<F> {
             *acc = goldilocks_extension_chip.mul_add_extension(ctx, &filter, &c, acc)?;
         }
         Ok(())
-    }
+    } // OK
 }
 
 #[derive(Clone)]

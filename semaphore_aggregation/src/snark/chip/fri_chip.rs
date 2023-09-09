@@ -1,4 +1,4 @@
-use halo2_proofs::{arithmetic::Field, plonk::Error};
+use halo2_proofs::{arithmetic::Field, plonk::Error, circuit::AssignedCell};
 use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField, FieldExt};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{power_of_two, AssignedValue, Term};
@@ -12,7 +12,7 @@ use crate::snark::types::{
         AssignedFriOpenings, AssignedFriProofValues, AssignedFriQueryRoundValues,
         AssignedMerkleCapValues,
     },
-    common_data::FriParams,
+    common_data::{FriParams, FriConfig},
     fri::{FriBatchInfo, FriInstanceInfo},
 };
 
@@ -55,7 +55,14 @@ impl<F: FieldExt> FriVerifierChip<F> {
         GoldilocksExtensionChip::new(&self.goldilocks_chip_config)
     }
 
-    fn verify_proof_of_work(&self) {}
+    fn verify_proof_of_work(&self, ctx: &mut RegionCtx<'_, F>, fri_pow_response: &AssignedCell<F, F>, config: &FriConfig) {
+        let goldilocks_chip = GoldilocksChip::new(&self.goldilocks_chip_config);
+        goldilocks_chip.assert_leading_zeros(
+            ctx,
+            fri_pow_response,
+            config.proof_of_work_bits + (64 - F::NUM_BITS) as u32,
+        );
+    }
 
     fn compute_reduced_openings(
         &self,
@@ -82,7 +89,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
             .enumerate()
             .map(|(i, bit)| Term::Assigned(&bit, power_of_two(i)))
             .collect_vec();
-        goldilocks_chip.compose(ctx, terms, Goldilocks::zero())
+        goldilocks_chip.compose(ctx, terms, Goldilocks::zero()) // XXX: not constrain this summation
     }
 
     // evaluation proof for initial polynomials at `x`
@@ -150,7 +157,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
             sum =
                 goldilocks_extension_chip.div_add_extension(ctx, &numerator, &denominator, &sum)?;
         }
-        Ok(sum)
+        Ok(sum) // NOTICE: not use pull/436
     }
 
     /// obtain subgroup element at index `x_index_bits` from the domain
@@ -221,7 +228,8 @@ impl<F: FieldExt> FriVerifierChip<F> {
             g_power = goldilocks_chip.mul(ctx, &g_power, &g)?;
             points.push((x, eval.clone()));
         }
-        // TODO : For now, only 2-arity is supported. Otherwise, FFT implementation over extension Field is required.
+        // Only 2-arity interpolation is supported.
+        assert_eq!(evals.len(), 2);
         // a0 -> a1
         // b0 -> b1
         // x  -> a1 + (x-a0)*(b1-a1)/(b0-a0)
@@ -263,6 +271,9 @@ impl<F: FieldExt> FriVerifierChip<F> {
             .collect_vec();
 
         let cap_index = self.calculate_cap_index(ctx, &x_index_bits[..])?;
+
+        // start verify_initial_merkle_proof
+
         // verify evaluation proofs for initial polynomials at `x_index` point
         self.verify_initial_merkle_proof(
             ctx,
@@ -274,7 +285,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
 
         let x_from_subgroup =
             self.x_from_subgroup(ctx, &x_index_bits.iter().rev().cloned().collect_vec())?;
-        let mut x_from_subgroup = goldilocks_chip.mul(ctx, &self.offset, &x_from_subgroup)?;
+        let mut x_from_subgroup = goldilocks_chip.mul(ctx, &self.offset, &x_from_subgroup)?; // self.offset = coset_shift // OK
 
         let mut prev_eval = self.batch_initial_polynomials(
             ctx,
@@ -292,7 +303,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
             let coset_index_bits = x_index_bits[arity_bits..].to_vec();
             let x_index_within_coset_bits = &x_index_bits[..arity_bits];
             let x_index_within_coset =
-                goldilocks_chip.from_bits(ctx, &x_index_within_coset_bits.to_vec())?;
+                goldilocks_chip.from_bits(ctx, &x_index_within_coset_bits.to_vec())?; // XXX: not constrain this summation
 
             // check the consistency of `prev_eval` and `next_eval`
             for i in 0..2 {
@@ -302,7 +313,7 @@ impl<F: FieldExt> FriVerifierChip<F> {
                 );
                 let next_eval_i = vector_chip.access(ctx, &x_index_within_coset)?;
                 goldilocks_chip.assert_equal(ctx, &prev_eval.0[i], &next_eval_i)?;
-            }
+            } // OK, random_access_extension
 
             prev_eval = self.next_eval(
                 ctx,
@@ -351,9 +362,28 @@ impl<F: FieldExt> FriVerifierChip<F> {
         fri_proof: &AssignedFriProofValues<F, 2>,
         fri_instance_info: &FriInstanceInfo<F, 2>,
     ) -> Result<(), Error> {
+        // if let Some(max_arity_bits) = params.max_arity_bits() {
+        //     self.check_recursion_config(max_arity_bits);
+        // }
+
+        // debug_assert_eq!(
+        //     params.final_poly_len(),
+        //     proof.final_poly.len(),
+        //     "Final polynomial has wrong degree."
+        // );
+
+        self.verify_proof_of_work(ctx, &fri_challenges.fri_pow_response, &self.fri_params.config);
+
+        // // Check that parameters are coherent.
+        // debug_assert_eq!(
+        //     params.config.num_query_rounds,
+        //     proof.query_round_proofs.len(),
+        //     "Number of query rounds does not match config."
+        // );
+
         // this value is the same across all queries
         let reduced_openings =
-            self.compute_reduced_openings(ctx, &fri_challenges.fri_alpha, fri_openings)?;
+            self.compute_reduced_openings(ctx, &fri_challenges.fri_alpha, fri_openings)?; // OK: from_os_and_alpha
         for (i, round_proof) in fri_proof.query_round_proofs.iter().enumerate() {
             self.check_consistency(
                 ctx,

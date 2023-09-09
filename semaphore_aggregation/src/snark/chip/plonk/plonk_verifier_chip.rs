@@ -210,7 +210,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
                 &vanishing_poly_zeta[i],
                 &computed_vanishing_poly,
             )?;
-        }
+        } // OK
 
         let merkle_caps = &[
             vk.constants_sigmas_cap.clone(),
@@ -225,12 +225,12 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
             0,
             0,
         ]);
-        let zeta_next = goldilocks_extension_chip.scalar_mul(ctx, &challenges.plonk_zeta, g)?;
+        let zeta_next = goldilocks_extension_chip.scalar_mul(ctx, &challenges.plonk_zeta, g)?; // XXX
         let fri_instance_info =
             FriInstanceInfo::new(&challenges.plonk_zeta, &zeta_next, common_data);
         let offset = self
             .goldilocks_chip()
-            .assign_constant(ctx, Goldilocks::multiplicative_generator())?;
+            .assign_constant(ctx, Goldilocks::multiplicative_generator())?; // XXX
         let fri_chip = FriVerifierChip::construct(
             &self.goldilocks_chip_config,
             spec.clone(),

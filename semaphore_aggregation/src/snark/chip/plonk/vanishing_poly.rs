@@ -15,6 +15,35 @@ use crate::snark::{
 };
 
 impl<F: FieldExt> PlonkVerifierChip<F> {
+    fn eval_gate_constraints(
+        &self,
+        ctx: &mut RegionCtx<'_, F>,
+        common_data: &CommonData<F>,
+        local_constants: &[AssignedExtensionFieldValue<F, 2>],
+        local_wires: &[AssignedExtensionFieldValue<F, 2>],
+        public_inputs_hash: &AssignedHashValues<F>,
+    ) -> Result<Vec<AssignedExtensionFieldValue<F, 2>>, Error> {
+        let goldilocks_extension_chip = GoldilocksExtensionChip::new(&self.goldilocks_chip_config);
+        let zero_extension = goldilocks_extension_chip.zero_extension(ctx)?;
+        let mut all_gate_constraints = vec![zero_extension; common_data.num_gate_constraints];
+        for (i, gate) in common_data.gates.iter().enumerate() {
+            let selector_index = common_data.selectors_info.selector_indices[i];
+            gate.0.eval_filtered_constraint(
+                ctx,
+                &self.goldilocks_chip_config,
+                local_constants,
+                local_wires,
+                public_inputs_hash,
+                i,
+                selector_index,
+                common_data.selectors_info.groups[selector_index].clone(),
+                common_data.selectors_info.num_selectors(),
+                &mut all_gate_constraints,
+            )?;
+        }
+        Ok(all_gate_constraints)
+    }
+
     pub fn eval_vanishing_poly(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -55,7 +84,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
         for j in 0..common_data.config.num_routed_wires {
             let k = common_data.k_is[j];
             s_ids.push(goldilocks_extension_chip.scalar_mul(ctx, x, k)?);
-        }
+        } // OK
 
         for i in 0..common_data.config.num_challenges {
             let z_x = &local_zs[i];
@@ -105,7 +134,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
                 max_degree,
             )?;
             vanishing_partial_products_terms.extend(partial_product_checks);
-        }
+        } // OK
 
         let vanishing_terms = [
             vanishing_z_1_terms,
@@ -121,35 +150,6 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
                 goldilocks_extension_chip.reduce_extension(ctx, &alpha, &vanishing_terms)
             })
             .collect()
-    }
-
-    fn eval_gate_constraints(
-        &self,
-        ctx: &mut RegionCtx<'_, F>,
-        common_data: &CommonData<F>,
-        local_constants: &[AssignedExtensionFieldValue<F, 2>],
-        local_wires: &[AssignedExtensionFieldValue<F, 2>],
-        public_inputs_hash: &AssignedHashValues<F>,
-    ) -> Result<Vec<AssignedExtensionFieldValue<F, 2>>, Error> {
-        let goldilocks_extension_chip = GoldilocksExtensionChip::new(&self.goldilocks_chip_config);
-        let zero_extension = goldilocks_extension_chip.zero_extension(ctx)?;
-        let mut all_gate_constraints = vec![zero_extension; common_data.num_gate_constraints];
-        for (i, gate) in common_data.gates.iter().enumerate() {
-            let selector_index = common_data.selectors_info.selector_indices[i];
-            gate.0.eval_filtered_constraint(
-                ctx,
-                &self.goldilocks_chip_config,
-                local_constants,
-                local_wires,
-                public_inputs_hash,
-                i,
-                selector_index,
-                common_data.selectors_info.groups[selector_index].clone(),
-                common_data.selectors_info.num_selectors(),
-                &mut all_gate_constraints,
-            )?;
-        }
-        Ok(all_gate_constraints)
     }
 
     fn eval_l_0_x(
@@ -175,7 +175,7 @@ impl<F: FieldExt> PlonkVerifierChip<F> {
             &neg_one_extension,
         )?;
         goldilocks_extension_chip.div_extension(ctx, &zero_poly, &denominator)
-    }
+    } // OK
 
     // \prod(g_i'(x))\phi_1(x) - \prod(f_i'(x))Z(x)
     // ..

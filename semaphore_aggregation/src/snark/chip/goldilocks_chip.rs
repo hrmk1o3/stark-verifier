@@ -1,6 +1,10 @@
 use std::marker::PhantomData;
 
-use halo2_proofs::{arithmetic::Field, circuit::Value, plonk::Error};
+use halo2_proofs::{
+    arithmetic::Field,
+    circuit::{AssignedCell, Value},
+    plonk::Error,
+};
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{
@@ -54,6 +58,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         big_to_fe::<Goldilocks>(fe_to_big::<F>(fe))
     }
 
+    // XXX: Check range in the Goldilocks field.
     pub fn assign_value(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -63,16 +68,16 @@ impl<F: FieldExt> GoldilocksChip<F> {
         main_gate.assign_value(ctx, unassigned)
     }
 
-    // TODO : decompose the Goldilocks value and range check
     pub fn assign_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
         constant: Goldilocks,
     ) -> Result<AssignedValue<F>, Error> {
         let constant: F = big_to_fe(fe_to_big::<Goldilocks>(constant));
-        self.assign_value(ctx, Value::known(constant))
+        self.assign_value(ctx, Value::known(constant)) // XXX: fixed value になっていない
     }
 
+    // XXX: Check range in the Goldilocks field.
     pub fn add(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -104,6 +109,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             .swap_remove(3))
     }
 
+    // XXX: Check range in the Goldilocks field.
     pub fn sub(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -137,7 +143,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             .swap_remove(4))
     }
 
-    // TODO : range check
+    // XXX: Check range in the Goldilocks field.
     pub fn mul(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -147,6 +153,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         self.mul_with_constant(ctx, lhs, rhs, Goldilocks::one())
     }
 
+    // XXX: Check range in the Goldilocks field.
     /// Assigns a new witness `r` as:
     /// `lhs * rhs * constant - p * q - r = 0`
     pub fn mul_with_constant(
@@ -183,6 +190,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             .swap_remove(3))
     }
 
+    // XXX: Check range in the Goldilocks field.
     pub fn mul_add_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -218,6 +226,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             .swap_remove(4))
     }
 
+    // XXX: Check range in the Goldilocks field.
     pub fn add_constant(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -249,6 +258,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
             .swap_remove(3))
     }
 
+    /// This function checks if `lhs` is the same as `rhs` in `F` (not the Goldilocks field).
+    // TODO: Checks if `lhs` is the same as `rhs` in the Goldilocks field.
     pub fn assert_equal(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -267,7 +278,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     ) -> Result<(), Error> {
         let one = self.assign_constant(ctx, Goldilocks::one())?;
         self.assert_equal(ctx, a, &one)
-    }
+    } // OK
 
     pub fn assert_zero(
         &self,
@@ -276,8 +287,9 @@ impl<F: FieldExt> GoldilocksChip<F> {
     ) -> Result<(), Error> {
         let zero = self.assign_constant(ctx, Goldilocks::zero())?;
         self.assert_equal(ctx, a, &zero)
-    }
+    } // OK
 
+    // XXX: Check range in the Goldilocks field.
     // TODO : optimize, underconstrained?
     pub fn compose(
         &self,
@@ -311,6 +323,10 @@ impl<F: FieldExt> GoldilocksChip<F> {
         main_gate.assign_bit(ctx, bit)
     }
 
+    // XXX: Check range in the Goldilocks field.
+    /// This function returns a pair of values (a', r) such that
+    /// If 0 < a < Goldilocks::MODULUS, then r = 0 and a' = a^(-1) mod Goldilocks::MODULUS.
+    /// If a = 0, then r = 1 and a' = 1.
     pub fn invert(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -320,8 +336,8 @@ impl<F: FieldExt> GoldilocksChip<F> {
         let goldilocks_modulus = self.goldilocks_modulus();
         let (one, zero) = (Goldilocks::one(), Goldilocks::zero());
 
-        // Returns 'r' as a condition bit that defines if inversion successful or not
-        // First enfoce 'r' to be a bit
+        // `r` means whether `a` is zero or not.
+        // First enforce `r` to be a bit
         // (a * a') - 1 + r = p * q
         // r * a' - r = 0
         // if r = 1 then a' = 1
@@ -395,6 +411,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
         Ok((a_inv, r))
     }
 
+    // NOTICE: Assume `a` and `b` are in the Goldilocks field.
     // TODO : is it okay?
     pub fn select(
         &self,
@@ -414,7 +431,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
     ) -> Result<AssignedCondition<F>, Error> {
         let (_, is_zero) = self.invert(ctx, a)?;
         Ok(is_zero)
-    }
+    } // OK
 
     /// Assigns array values of bit values which is equal to decomposition of
     /// given assigned value
@@ -454,6 +471,27 @@ impl<F: FieldExt> GoldilocksChip<F> {
         Ok(bits)
     }
 
+    pub fn range_check(
+        &self,
+        ctx: &mut RegionCtx<'_, F>,
+        x: &AssignedCell<F, F>,
+        n_log: usize,
+    ) -> Result<(), Error> {
+        let _ = self.to_bits(ctx, x, n_log as usize)?;
+
+        Ok(())
+    }
+
+    /// Asserts that `x`'s big-endian bit representation has at least `leading_zeros` leading zeros.
+    pub(crate) fn assert_leading_zeros(
+        &self,
+        ctx: &mut RegionCtx<'_, F>,
+        x: &AssignedCell<F, F>,
+        leading_zeros: u32,
+    ) -> Result<(), Error> {
+        self.range_check(ctx, x, (64 - leading_zeros) as usize)
+    } // OK
+
     pub fn from_bits(
         &self,
         ctx: &mut RegionCtx<'_, F>,
@@ -478,7 +516,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             result = self.mul(ctx, &result, &result)?;
         }
         Ok(result)
-    }
+    } // OK
 
     pub fn exp_from_bits(
         &self,
@@ -497,7 +535,7 @@ impl<F: FieldExt> GoldilocksChip<F> {
             x = self.mul(ctx, &x, &multiplicand)?;
         }
         Ok(x)
-    }
+    } // OK
 
     pub fn is_equal(
         &self,
@@ -507,5 +545,219 @@ impl<F: FieldExt> GoldilocksChip<F> {
     ) -> Result<AssignedCondition<F>, Error> {
         let a_mimus_b = self.sub(ctx, a, b)?;
         self.is_zero(ctx, &a_mimus_b)
+    } // OK
+}
+
+#[cfg(test)]
+mod tests {
+    use halo2_proofs::{
+        circuit::{floor_planner::V1, *},
+        dev::MockProver,
+        halo2curves::bn256::Fr,
+        plonk::*,
+    };
+    use halo2curves::group::ff::PrimeField;
+    use halo2wrong_maingate::compose;
+
+    use crate::snark::verifier_circuit::MainGateWithRangeConfig;
+
+    use super::*;
+
+    #[derive(Default)]
+    pub struct GoldilocksAdditionCircuit {
+        pub a: Goldilocks,
+        pub b: Goldilocks,
+        pub c: Goldilocks,
+    }
+
+    impl GoldilocksAdditionCircuit {
+        pub fn new(a: Goldilocks, b: Goldilocks) -> Self {
+            let c = a + b;
+
+            Self { a, b, c }
+        }
+
+        pub fn degree_bits(&self) -> u32 {
+            12
+        }
+
+        pub fn instance(&self) -> Vec<Vec<Fr>> {
+            let first_column = [self.c]
+                .map(|v| big_to_fe::<Fr>(fe_to_big::<Goldilocks>(v)))
+                .to_vec();
+
+            vec![first_column]
+        }
+    }
+
+    impl Circuit<Fr> for GoldilocksAdditionCircuit {
+        type Config = MainGateWithRangeConfig<Fr>;
+        type FloorPlanner = V1;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
+            MainGateWithRangeConfig::new(meta)
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<Fr>,
+        ) -> Result<(), Error> {
+            let main_gate = MainGate::new(config.main_gate_config.clone());
+            let goldilocks_chip_config = GoldilocksChip::configure(&config.main_gate_config);
+
+            let a = big_to_fe::<Fr>(fe_to_big::<Goldilocks>(self.a));
+            let b = big_to_fe::<Fr>(fe_to_big::<Goldilocks>(self.b));
+            let c = big_to_fe::<Fr>(fe_to_big::<Goldilocks>(self.c));
+
+            let c_assigned = layouter.assign_region(
+                || "addition in the Goldilocks field",
+                |region| {
+                    let ctx = &mut RegionCtx::new(region, 0);
+                    let goldilocks_chip = GoldilocksChip::new(&goldilocks_chip_config);
+                    let a_assigned = goldilocks_chip.assign_value(ctx, Value::known(a))?;
+                    let b_assigned = goldilocks_chip.assign_value(ctx, Value::known(b))?;
+                    let c_assigned = goldilocks_chip.add(ctx, &a_assigned, &b_assigned)?;
+
+                    let expected_c_assigned = goldilocks_chip.assign_value(ctx, Value::known(c))?;
+                    main_gate.assert_equal(ctx, &c_assigned, &expected_c_assigned)?;
+
+                    Ok(c_assigned)
+                },
+            )?;
+
+            main_gate.expose_public(layouter, c_assigned, 0)?;
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_add_circuit() {
+        let a = Goldilocks::from(1u64);
+        let b = Goldilocks::from(2u64);
+        // let c = Goldilocks::from(3u64);
+        let circuit = GoldilocksAdditionCircuit::new(a, b);
+        let instance = circuit.instance();
+        let k = circuit.degree_bits();
+
+        // runs mock prover
+        let mock_prover = MockProver::run(k, &circuit, instance).unwrap();
+        mock_prover.assert_satisfied();
+    }
+
+    #[derive(Default)]
+    pub struct GoldilocksDecomposeCircuit<const NUM_BITS: usize> {
+        pub a: Goldilocks,
+    }
+
+    impl<const NUM_BITS: usize> GoldilocksDecomposeCircuit<NUM_BITS> {
+        pub fn new(a: Goldilocks) -> Self {
+            assert!(NUM_BITS <= Goldilocks::NUM_BITS as usize);
+
+            // let mut decomposed_a = decompose(a, Goldilocks::NUM_BITS as usize, 1);
+            // for limb in decomposed_a.drain(NUM_BITS..) {
+            //     assert_eq!(limb, Goldilocks::zero());
+            // }
+
+            Self {
+                a,
+            }
+        }
+
+        pub fn degree_bits(&self) -> u32 {
+            12
+        }
+
+        pub fn instance(&self) -> Vec<Vec<Fr>> {
+            let first_column = [self.a]
+                .map(|v| big_to_fe::<Fr>(fe_to_big::<Goldilocks>(v)))
+                .to_vec();
+
+            vec![first_column]
+        }
+    }
+
+    impl<const NUM_BITS: usize> Circuit<Fr> for GoldilocksDecomposeCircuit<NUM_BITS> {
+        type Config = MainGateWithRangeConfig<Fr>;
+        type FloorPlanner = V1;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
+            MainGateWithRangeConfig::new(meta)
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<Fr>,
+        ) -> Result<(), Error> {
+            let main_gate = MainGate::new(config.main_gate_config.clone());
+            let goldilocks_chip_config = GoldilocksChip::configure(&config.main_gate_config);
+
+            let a = Value::known(big_to_fe::<Fr>(fe_to_big::<Goldilocks>(self.a)));
+
+            let a_assigned = layouter.assign_region(
+                || "addition in the Goldilocks field",
+                |region| {
+                    let ctx = &mut RegionCtx::new(region, 0);
+                    let goldilocks_chip = GoldilocksChip::new(&goldilocks_chip_config);
+                    let a_assigned = goldilocks_chip.assign_value(ctx, a)?;
+                    let decomposed_a_assigned = goldilocks_chip.to_bits(ctx, &a_assigned, NUM_BITS)?;
+                    goldilocks_chip.assert_one(ctx, &decomposed_a_assigned[63])?;
+
+                    Ok(a_assigned)
+                },
+            )?;
+
+            main_gate.expose_public(layouter, a_assigned, 0)?;
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_to_bits_circuit() {
+        let a = Goldilocks::from(105u64);
+        let circuit = GoldilocksDecomposeCircuit::<7>::new(a);
+        let instance = circuit.instance();
+        let k = circuit.degree_bits();
+
+        // runs mock prover
+        let mock_prover = MockProver::run(k, &circuit, instance).unwrap();
+        mock_prover.assert_satisfied();
+    }
+
+    // XXX: should panic?
+    #[test]
+    fn test_to_bits_circuit_overflow() {
+        let a = Goldilocks::from(u64::MAX - 4);
+        let circuit = GoldilocksDecomposeCircuit::<64>::new(a);
+        let instance = circuit.instance();
+        let k = circuit.degree_bits();
+
+        // runs mock prover
+        let mock_prover = MockProver::run(k, &circuit, instance).unwrap();
+        mock_prover.assert_satisfied();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_panic_to_bits_circuit() {
+        let a = Goldilocks::from(105u64);
+        let circuit = GoldilocksDecomposeCircuit::<6>::new(a);
+        let instance = circuit.instance();
+        let k = circuit.degree_bits();
+
+        // runs mock prover
+        let mock_prover = MockProver::run(k, &circuit, instance).unwrap();
+        mock_prover.assert_satisfied();
     }
 }
