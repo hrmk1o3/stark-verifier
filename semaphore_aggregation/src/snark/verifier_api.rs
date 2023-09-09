@@ -8,6 +8,8 @@ use colored::Colorize;
 use halo2_kzg_srs::{Srs, SrsFormat};
 use halo2_proofs::dev::MockProver;
 use halo2_proofs::halo2curves::bn256::{Bn256, Fq, Fr, G1Affine};
+use halo2_proofs::halo2curves::pairing::Engine;
+use halo2_proofs::halo2curves::serde::SerdeObject;
 use halo2_proofs::plonk::{
     create_proof, keygen_pk, keygen_vk, verify_proof, Circuit, ProvingKey, VerifyingKey,
 };
@@ -202,6 +204,32 @@ pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonGoldi
 
 pub fn gen_srs(k: u32) -> ParamsKZG<Bn256> {
     EvmVerifier::gen_srs(k)
+}
+
+fn read_srs_from_file<E: Engine + std::fmt::Debug>() -> std::io::Result<ParamsKZG<E>>
+where
+    <E as Engine>::G1Affine: SerdeObject,
+    <E as Engine>::G2Affine: SerdeObject,
+{
+    let mut file = std::fs::OpenOptions::new().read(true).open("srs.txt")?;
+    ParamsKZG::read(&mut file)
+}
+
+pub fn load_srs() -> anyhow::Result<ParamsKZG<Bn256>> {
+    println!("load SRS");
+    let srs = if let Ok(srs) = read_srs_from_file() {
+        srs
+    } else {
+        println!("SRS is not found");
+        let srs = gen_srs(23);
+        let mut srs_file = std::fs::File::create("srs.txt").expect("creation failed");
+        srs.write(&mut srs_file)?;
+        println!("Generated SRS");
+
+        srs
+    };
+
+    Ok(srs)
 }
 
 /// Public API for generating Halo2 proof for Plonky2 verifier circuit
