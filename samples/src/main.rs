@@ -4,7 +4,7 @@ use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-use semaphore_aggregation::snark::verifier_api::{verify_inside_snark, load_srs};
+use semaphore_aggregation::snark::verifier_api::verify_inside_snark;
 
 /// An example of using Plonky2 to prove a statement of the form
 /// "I know n * (n + 1) * ... * (n + 99)".
@@ -85,12 +85,11 @@ fn main() -> Result<()> {
     pw.set_proof_with_pis_target(&proof_with_pis_t, &proof_with_pis);
     let proof_with_pis = circuit_data.prove(pw)?;
 
-    let srs = load_srs()?;
     verify_inside_snark((
         proof_with_pis,
         circuit_data.verifier_only,
         circuit_data.common,
-    ), &srs);
+    ));
 
     Ok(())
 }

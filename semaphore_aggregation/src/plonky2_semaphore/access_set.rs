@@ -15,7 +15,7 @@ use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
 use plonky2::plonk::config::Hasher;
 use plonky2::plonk::proof::ProofWithPublicInputs;
 
-use crate::snark::verifier_api::{verify_inside_snark, gen_srs};
+use crate::snark::verifier_api::verify_inside_snark;
 
 use super::report_elapsed;
 use super::signal::{Digest, Signal, C, F};
@@ -50,8 +50,7 @@ impl AccessSet {
             verifier_data.verifier_only.clone(),
             verifier_data.common.clone(),
         );
-        let srs = gen_srs(23);
-        verify_inside_snark(proof, &srs);
+        verify_inside_snark(proof);
         Ok(())
     }
 

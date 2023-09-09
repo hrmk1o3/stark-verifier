@@ -198,8 +198,9 @@ pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonGoldi
     let spec = Spec::<Goldilocks, 12, 11>::new(8, 22);
 
     let verifier_circuit = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let _prover = MockProver::run(23, &verifier_circuit, vec![instances]).unwrap();
-    _prover.assert_satisfied()
+    let prover = MockProver::run(23, &verifier_circuit, vec![instances]).unwrap();
+    prover.assert_satisfied();
+    println!("{}", "Mock prover passes".white().bold());
 }
 
 pub fn gen_srs(k: u32) -> ParamsKZG<Bn256> {
@@ -235,7 +236,7 @@ pub fn load_srs() -> anyhow::Result<ParamsKZG<Bn256>> {
 /// Public API for generating Halo2 proof for Plonky2 verifier circuit
 /// feed Plonky2 proof, `VerifierOnlyCircuitData`, `CommonCircuitData`
 /// This runs real prover and generates valid SNARK proof, generates EVM verifier and runs the verifier
-pub fn verify_inside_snark(proof: ProofTuple<GoldilocksField, PoseidonGoldilocksConfig, 2>, srs: &ParamsKZG<Bn256>) {
+pub fn verify_inside_snark(proof: ProofTuple<GoldilocksField, PoseidonGoldilocksConfig, 2>) {
     let (proof_with_public_inputs, vd, cd) = proof;
     let proof = ProofValues::<Fr, 2>::from(proof_with_public_inputs.proof);
     let instances = proof_with_public_inputs
@@ -249,11 +250,12 @@ pub fn verify_inside_snark(proof: ProofTuple<GoldilocksField, PoseidonGoldilocks
 
     // runs mock prover
     let circuit = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let mock_prover = MockProver::run(22, &circuit, vec![instances.clone()]).unwrap();
+    let mock_prover = MockProver::run(23, &circuit, vec![instances.clone()]).unwrap();
     mock_prover.assert_satisfied();
     println!("{}", "Mock prover passes".white().bold());
 
     // generates EVM verifier
+    let srs = &load_srs().unwrap();
     let pk = EvmVerifier::gen_pk(srs, &circuit);
     let deployment_code = EvmVerifier::gen_evm_verifier(srs, pk.get_vk(), vec![instances.len()]);
 

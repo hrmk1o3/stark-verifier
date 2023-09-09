@@ -272,7 +272,7 @@ mod tests {
             recursion::report_elapsed,
             signal::{Digest, F},
         },
-        snark::verifier_api::{verify_inside_snark, verify_inside_snark_mock, gen_srs},
+        snark::verifier_api::verify_inside_snark,
     };
 
     fn semaphore_aggregation(
@@ -342,12 +342,11 @@ mod tests {
                 .chain(final_signal.topics.clone().into_iter().flatten().to_owned())
                 .collect(),
         };
-        let srs = gen_srs(23);
         verify_inside_snark((
             proof,
             verifier_circuit_data.verifier_only.clone(),
             verifier_circuit_data.common.clone(),
-        ), &srs);
+        ));
 
         Ok(())
     }
