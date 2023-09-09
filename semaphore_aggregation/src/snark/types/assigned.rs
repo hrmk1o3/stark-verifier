@@ -10,21 +10,24 @@ pub struct AssignedHashValues<F: FieldExt> {
 pub struct AssignedMerkleCapValues<F: FieldExt>(pub Vec<AssignedHashValues<F>>);
 
 #[derive(Clone, Debug)]
-pub struct AssignedFieldValue<F: FieldExt>(AssignedValue<F>);
+pub struct AssignedFieldValue<F: FieldExt>{
+    value: AssignedValue<F>,
+    pub(crate) is_asserted: std::cell::Cell<bool>,
+}
 
 impl<F: FieldExt> From<AssignedValue<F>> for AssignedFieldValue<F> {
     fn from(value: AssignedValue<F>) -> Self {
-        Self(value)
+        Self { value, is_asserted: std::cell::Cell::new(false) }
     }
 }
 
 impl<F: FieldExt> AssignedFieldValue<F> {
     pub fn asserted(value: AssignedValue<F>) -> Self {
-        Self(value)
+        Self { value, is_asserted: std::cell::Cell::new(true) }
     }
 
-    pub fn is_asserted() -> bool {
-        true
+    pub fn is_asserted(&self) -> bool {
+        self.is_asserted.get()
     }
 }
 
@@ -32,25 +35,25 @@ impl<F: FieldExt> std::ops::Deref for AssignedFieldValue<F> {
     type Target = AssignedValue<F>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.value
     }
 }
 
 impl<F: FieldExt> std::ops::DerefMut for AssignedFieldValue<F> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.value
     }
 }
 
 impl<F: FieldExt> AsRef<AssignedValue<F>> for AssignedFieldValue<F> {
     fn as_ref(&self) -> &AssignedValue<F> {
-        &self.0
+        &self.value
     }
 }
 
 impl<F: FieldExt> AsMut<AssignedValue<F>> for AssignedFieldValue<F> {
     fn as_mut(&mut self) -> &mut AssignedValue<F> {
-        &mut self.0
+        &mut self.value
     }
 }
 
