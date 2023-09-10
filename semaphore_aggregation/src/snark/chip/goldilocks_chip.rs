@@ -5,7 +5,7 @@ use halo2_proofs::{
     circuit::Value,
     plonk::Error,
 };
-use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
+use halo2curves::{goldilocks::fp::Goldilocks, FieldExt, group::ff::PrimeField};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{
     big_to_fe, decompose, fe_to_big, power_of_two, AssignedCondition,
@@ -62,22 +62,69 @@ impl<F: FieldExt> GoldilocksChip<F> {
 
     pub fn assert_in_field(
         &self, 
-        _ctx: &mut RegionCtx<'_, F>,
+        ctx: &mut RegionCtx<'_, F>,
         value: &AssignedFieldValue<F>
     ) -> Result<(), Error> {
+        if !value.is_asserted() {
+            value
+                .value_unchecked()
+                .map(|v| {
+                    assert!(
+                        fe_to_big(*v) < self.goldilocks_modulus(),
+                        "given value is not in the Goldilocks field"
+                    )
+                });
+
+            #[cfg(not(feature = "not-constrain-range-check"))]
+            {
+                let main_gate = self.main_gate();
+                main_gate.to_bits(ctx, &value.value, 64)?; // 0 <= value < 2^64
+                let shifted_value = main_gate.add_constant(ctx, &value.value, F::from(u32::MAX as u64))?; // 2^64 - goldilocks_modulus = 2^32 - 1
+                main_gate.to_bits(ctx, &shifted_value, 64)?; // 0 <= value + 2^64 - goldilocks_modulus < 2^64
+            }
+
+            value.is_asserted.set(true);
+        }
+
+        Ok(())
+    }
+
+    pub fn assert_non_zero_in_field(
+        &self, 
+        ctx: &mut RegionCtx<'_, F>,
+        value: &AssignedFieldValue<F>
+    ) -> Result<(), Error> {
+        let main_gate = self.main_gate();
         if !value.is_asserted() {
             // XXX: Check range in the Goldilocks field as circuit.
             value
                 .value_unchecked()
                 .map(|v| {
+                    assert_eq!(v, &F::zero(), "given value is zero");
                     assert!(
-                        fe_to_big(*v) <= fe_to_big(-Goldilocks::from(1)),
-                        "value is not in the Goldilocks field"
-                    )
+                        fe_to_big(*v) < self.goldilocks_modulus(),
+                        "given value is not in the Goldilocks field"
+                    );
                 });
-        }
 
-        value.is_asserted.set(true);
+            #[cfg(not(feature = "not-constrain-range-check"))]
+            {
+                let shifted_value = main_gate.add_constant(ctx, &value.value, F::from(u32::MAX as u64))?; // 2^64 - goldilocks_modulus = 2^32 - 1
+                let decomposed = main_gate.to_bits(ctx, &shifted_value, 64)?; // 0 <= value + 2^64 - goldilocks_modulus < 2^64
+                let terms = decomposed
+                    .iter()
+                    .skip(32)
+                    .enumerate()
+                    .map(|(i, bit)| Term::Assigned(bit, power_of_two::<F>(i)))
+                    .collect::<Vec<_>>();
+                let result = main_gate.compose(ctx, &terms, F::zero())?; // higher 32-bits value of shifted_value
+                main_gate.assert_not_zero(ctx, &result)?; // 2^32 <= value + 2^64 - goldilocks_modulus
+            }
+
+            value.is_asserted.set(true);
+        } else {
+            main_gate.assert_not_zero(ctx, &value.value)?;
+        }
 
         Ok(())
     }

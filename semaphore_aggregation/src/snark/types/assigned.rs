@@ -12,7 +12,7 @@ pub struct AssignedMerkleCapValues<F: FieldExt>(pub Vec<AssignedHashValues<F>>);
 
 #[derive(Clone, Debug)]
 pub struct AssignedFieldValue<F: FieldExt>{
-    value: AssignedValue<F>,
+    pub(crate) value: AssignedValue<F>,
     pub(crate) is_asserted: std::cell::Cell<bool>,
 }
 

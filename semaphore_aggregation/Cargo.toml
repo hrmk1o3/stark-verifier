@@ -27,3 +27,6 @@ snark-verifier = { git = "https://github.com/privacy-scaling-explorations/snark-
 colored = "2.0.0"
 halo2_kzg_srs = { git = "https://github.com/han0110/halo2-kzg-srs" }
 rayon = "1.5.3"
+
+[features]
+not-constrain-range-check = []
