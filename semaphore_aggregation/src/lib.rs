@@ -3,7 +3,7 @@ use plonky2::plonk::{
     proof::ProofWithPublicInputs,
 };
 
-pub mod plonky2_semaphore;
+// pub mod plonky2_semaphore;
 pub mod snark;
 
 pub type ProofTuple<F, C, const D: usize> = (

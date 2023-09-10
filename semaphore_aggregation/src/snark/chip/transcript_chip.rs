@@ -1,5 +1,5 @@
 use crate::snark::{
-    chip::hasher_chip::HasherChip,
+    chip::goldilocks_hasher_chip::HasherChip,
     types::assigned::{AssignedExtensionFieldValue, AssignedHashValues, AssignedMerkleCapValues, AssignedFieldValue},
 };
 use halo2_proofs::arithmetic::FieldExt;
