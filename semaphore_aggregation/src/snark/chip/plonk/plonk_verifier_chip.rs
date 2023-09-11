@@ -4,7 +4,7 @@ use crate::snark::{
         goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
         transcript_chip::TranscriptChip,
     },
-    chip::{goldilocks_extension_chip::GoldilocksExtensionChip, goldilocks_hasher_chip::HasherChip},
+    chip::{goldilocks_extension_chip::GoldilocksExtensionChip, hasher_chip::HasherChip},
     types::{
         assigned::{
             AssignedExtensionFieldValue, AssignedFriChallenges, AssignedFriProofValues,

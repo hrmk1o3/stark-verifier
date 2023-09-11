@@ -11,7 +11,7 @@ use crate::snark::types::assigned::{AssignedMerkleCapValues, AssignedMerkleProof
 
 use super::{
     goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
-    goldilocks_hasher_chip::HasherChip,
+    hasher_chip::HasherChip,
     vector_chip::VectorChip,
 };
 

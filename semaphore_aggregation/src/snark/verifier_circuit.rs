@@ -5,11 +5,12 @@ use halo2_proofs::{
     halo2curves::bn256::Fr,
     plonk::*,
 };
-use halo2curves::goldilocks::fp::Goldilocks;
+use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions, big_to_fe, fe_to_big};
 use itertools::Itertools;
 use poseidon::Spec;
+use poseidon_circuit::{hash::{SpongeConfig, PoseidonHashTable, SpongeChip}, DEFAULT_STEP, poseidon::Pow5Chip};
 use std::marker::PhantomData;
 
 use super::{
@@ -144,8 +145,14 @@ impl Verifier {
     }
 }
 
+#[derive(Clone)]
+pub struct VerifierConfig {
+    pub hasher_config: SpongeConfig<Fr, Pow5Chip<Fr, 3, 2>>,
+    pub main_gate_config: MainGateWithRangeConfig<Fr>
+}
+
 impl Circuit<Fr> for Verifier {
-    type Config = MainGateWithRangeConfig<Fr>;
+    type Config = VerifierConfig;
     type FloorPlanner = V1;
 
     fn without_witnesses(&self) -> Self {
@@ -159,7 +166,14 @@ impl Circuit<Fr> for Verifier {
     }
 
     fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
-        MainGateWithRangeConfig::new(meta)
+        let hash_tbl = [0; 6].map(|_| meta.advice_column());
+        let q_enable = meta.fixed_column();
+        let hasher_config = SpongeConfig::configure_sub(meta, (q_enable, hash_tbl), DEFAULT_STEP);
+        let main_gate_config = MainGateWithRangeConfig::new(meta);
+
+        VerifierConfig {
+            hasher_config, main_gate_config
+        }
     }
 
     fn synthesize(
@@ -167,8 +181,8 @@ impl Circuit<Fr> for Verifier {
         config: Self::Config,
         mut layouter: impl Layouter<Fr>,
     ) -> Result<(), Error> {
-        let main_gate = MainGate::new(config.main_gate_config.clone());
-        let goldilocks_chip_config = GoldilocksChip::configure(&config.main_gate_config);
+        let main_gate = MainGate::new(config.main_gate_config.main_gate_config.clone());
+        let goldilocks_chip_config = GoldilocksChip::configure(&config.main_gate_config.main_gate_config);
         let assigned_proof_with_pis = self.assign_proof_with_pis(
             &goldilocks_chip_config,
             layouter.namespace(|| "Assign proof and public inputs"),
@@ -215,6 +229,25 @@ impl Circuit<Fr> for Verifier {
         {
             main_gate.expose_public(layouter.namespace(|| ""), (*public_input).clone(), row)?;
         }
+
+        let message1 = [
+            Fr::from_str_vartime("1").unwrap(),
+            Fr::from_str_vartime("2").unwrap(),
+        ];
+        let message2 = [
+            Fr::from_str_vartime("0").unwrap(),
+            Fr::from_str_vartime("1").unwrap(),
+        ];
+        let poseidon_data = PoseidonHashTable {
+            inputs: vec![message1, message2],
+            ..Default::default()
+        };
+        let poseidon_calcs = 3;
+
+        let chip =
+            SpongeChip::<Fr, DEFAULT_STEP, Pow5Chip<Fr, 3, 2>>::construct(config.hasher_config, &poseidon_data, poseidon_calcs);
+        chip.load(&mut layouter)?;
+
         Ok(())
     }
 }
