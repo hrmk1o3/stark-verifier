@@ -22,6 +22,15 @@ impl<F: FieldExt> From<AssignedValue<F>> for AssignedFieldValue<F> {
     }
 }
 
+impl<F: FieldExt> From<AssignedFieldValue<F>> for AssignedValue<F> {
+    fn from(value: AssignedFieldValue<F>) -> Self {
+        assert!(value.is_asserted());
+
+        value.value
+    }
+}
+
+
 impl<F: FieldExt> AssignedFieldValue<F> {
     pub fn asserted(value: AssignedValue<F>) -> Self {
         Self { value, is_asserted: std::cell::Cell::new(true) }

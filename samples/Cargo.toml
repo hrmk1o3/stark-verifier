@@ -9,3 +9,6 @@ edition = "2021"
 anyhow = "1.0.44"
 plonky2 = { git = "https://github.com/DoHoonKim8/plonky2" }
 semaphore_aggregation = { path = "../semaphore_aggregation" }
+
+[features]
+not-constrain-range-check = ["semaphore_aggregation/not-constrain-range-check"]

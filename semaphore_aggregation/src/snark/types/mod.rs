@@ -14,6 +14,7 @@ use plonky2::{
 use self::assigned::{AssignedExtensionFieldValue, AssignedHashValues, AssignedMerkleCapValues};
 
 use super::chip::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
+use super::config::PoseidonBN128Hash;
 
 pub mod assigned;
 pub mod common_data;
@@ -89,6 +90,13 @@ impl<F: FieldExt> MerkleCapValues<F> {
 
 impl<F: FieldExt> From<MerkleCap<GoldilocksField, PoseidonHash>> for MerkleCapValues<F> {
     fn from(value: MerkleCap<GoldilocksField, PoseidonHash>) -> Self {
+        let cap_values = value.0.iter().map(|h| HashValues::from(*h)).collect();
+        MerkleCapValues(cap_values)
+    }
+}
+
+impl<F: FieldExt> From<MerkleCap<GoldilocksField, PoseidonBN128Hash>> for MerkleCapValues<F> {
+    fn from(value: MerkleCap<GoldilocksField, PoseidonBN128Hash>) -> Self {
         let cap_values = value.0.iter().map(|h| HashValues::from(*h)).collect();
         MerkleCapValues(cap_values)
     }

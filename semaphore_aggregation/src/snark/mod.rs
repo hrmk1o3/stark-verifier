@@ -7,6 +7,7 @@ const R_F: usize = HALF_N_FULL_ROUNDS * 2;
 const R_F_HALF: usize = HALF_N_FULL_ROUNDS;
 const R_P: usize = N_PARTIAL_ROUNDS;
 
+pub mod config;
 pub mod chip;
 pub mod types;
 pub mod utils;

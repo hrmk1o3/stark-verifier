@@ -1,4 +1,5 @@
 use crate::snark::chip::goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig};
+use crate::snark::config::{PoseidonBN128Hash, PoseidonBN128GoldilocksConfig};
 
 use super::assigned::{
     AssignedExtensionFieldValue, AssignedFriInitialTreeProofValues, AssignedFriProofValues,
@@ -135,6 +136,17 @@ impl<F: FieldExt> From<MerkleProof<GoldilocksField, PoseidonHash>> for MerklePro
     }
 }
 
+impl<F: FieldExt> From<MerkleProof<GoldilocksField, PoseidonBN128Hash>> for MerkleProofValues<F> {
+    fn from(value: MerkleProof<GoldilocksField, PoseidonBN128Hash>) -> Self {
+        let siblings = value
+            .siblings
+            .iter()
+            .map(|value| HashValues::from(*value))
+            .collect();
+        MerkleProofValues { siblings }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FriInitialTreeProofValues<F: FieldExt> {
     pub evals_proofs: Vec<(Vec<Goldilocks>, MerkleProofValues<F>)>,
@@ -144,6 +156,24 @@ impl<F: FieldExt> From<FriInitialTreeProof<GoldilocksField, PoseidonHash>>
     for FriInitialTreeProofValues<F>
 {
     fn from(value: FriInitialTreeProof<GoldilocksField, PoseidonHash>) -> Self {
+        let evals_proofs = value
+            .evals_proofs
+            .iter()
+            .map(|(evals, proofs)| {
+                let evals_values: Vec<Goldilocks> =
+                    evals.iter().map(|f| Goldilocks::from(f.0)).collect();
+                let proofs_values = MerkleProofValues::from(proofs.clone());
+                (evals_values, proofs_values)
+            })
+            .collect();
+        FriInitialTreeProofValues { evals_proofs }
+    }
+}
+
+impl<F: FieldExt> From<FriInitialTreeProof<GoldilocksField, PoseidonBN128Hash>>
+    for FriInitialTreeProofValues<F>
+{
+    fn from(value: FriInitialTreeProof<GoldilocksField, PoseidonBN128Hash>) -> Self {
         let evals_proofs = value
             .evals_proofs
             .iter()
@@ -207,6 +237,23 @@ impl<F: FieldExt> From<FriQueryStep<GoldilocksField, PoseidonHash, 2>>
     }
 }
 
+impl<F: FieldExt> From<FriQueryStep<GoldilocksField, PoseidonBN128Hash, 2>>
+    for FriQueryStepValues<F, 2>
+{
+    fn from(value: FriQueryStep<GoldilocksField, PoseidonBN128Hash, 2>) -> Self {
+        let evals_values = value
+            .evals
+            .iter()
+            .map(|e| ExtensionFieldValue::from(e.0))
+            .collect();
+        let merkle_proof_values = MerkleProofValues::from(value.merkle_proof.clone());
+        FriQueryStepValues {
+            evals: evals_values,
+            merkle_proof: merkle_proof_values,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FriQueryRoundValues<F: FieldExt, const D: usize> {
     pub initial_trees_proof: FriInitialTreeProofValues<F>,
@@ -217,6 +264,21 @@ impl<F: FieldExt> From<FriQueryRound<GoldilocksField, PoseidonHash, 2>>
     for FriQueryRoundValues<F, 2>
 {
     fn from(value: FriQueryRound<GoldilocksField, PoseidonHash, 2>) -> Self {
+        Self {
+            initial_trees_proof: FriInitialTreeProofValues::from(value.initial_trees_proof),
+            steps: value
+                .steps
+                .iter()
+                .map(|step| FriQueryStepValues::from(step.clone()))
+                .collect_vec(),
+        }
+    }
+}
+
+impl<F: FieldExt> From<FriQueryRound<GoldilocksField, PoseidonBN128Hash, 2>>
+    for FriQueryRoundValues<F, 2>
+{
+    fn from(value: FriQueryRound<GoldilocksField, PoseidonBN128Hash, 2>) -> Self {
         Self {
             initial_trees_proof: FriInitialTreeProofValues::from(value.initial_trees_proof),
             steps: value
@@ -342,6 +404,25 @@ impl<F: FieldExt> From<FriProof<GoldilocksField, PoseidonHash, 2>> for FriProofV
     }
 }
 
+impl<F: FieldExt> From<FriProof<GoldilocksField, PoseidonBN128Hash, 2>> for FriProofValues<F, 2> {
+    fn from(value: FriProof<GoldilocksField, PoseidonBN128Hash, 2>) -> Self {
+        Self {
+            commit_phase_merkle_cap_values: value
+                .commit_phase_merkle_caps
+                .iter()
+                .map(|cap| MerkleCapValues::from(cap.clone()))
+                .collect_vec(),
+            query_round_proofs: value
+                .query_round_proofs
+                .iter()
+                .map(|proof| FriQueryRoundValues::from(proof.clone()))
+                .collect_vec(),
+            final_poly: PolynomialCoeffsExtValues::from(value.final_poly),
+            pow_witness: to_goldilocks(value.pow_witness),
+        }
+    }
+}
+
 impl<F: FieldExt, const D: usize> FriProofValues<F, D> {
     pub fn assign(
         config: &GoldilocksChipConfig<F>,
@@ -400,6 +481,20 @@ pub struct ProofValues<F: FieldExt, const D: usize> {
 
 impl<F: FieldExt> From<Proof<GoldilocksField, PoseidonGoldilocksConfig, 2>> for ProofValues<F, 2> {
     fn from(value: Proof<GoldilocksField, PoseidonGoldilocksConfig, 2>) -> Self {
+        Self {
+            wires_cap: MerkleCapValues::from(value.wires_cap),
+            plonk_zs_partial_products_cap: MerkleCapValues::from(
+                value.plonk_zs_partial_products_cap,
+            ),
+            quotient_polys_cap: MerkleCapValues::from(value.quotient_polys_cap),
+            openings: OpeningSetValues::from(value.openings),
+            opening_proof: FriProofValues::from(value.opening_proof),
+        }
+    }
+}
+
+impl<F: FieldExt> From<Proof<GoldilocksField, PoseidonBN128GoldilocksConfig, 2>> for ProofValues<F, 2> {
+    fn from(value: Proof<GoldilocksField, PoseidonBN128GoldilocksConfig, 2>) -> Self {
         Self {
             wires_cap: MerkleCapValues::from(value.wires_cap),
             plonk_zs_partial_products_cap: MerkleCapValues::from(

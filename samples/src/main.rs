@@ -4,6 +4,7 @@ use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+use semaphore_aggregation::snark::config::PoseidonBN128GoldilocksConfig;
 use semaphore_aggregation::snark::verifier_api::verify_inside_snark_mock;
 // use semaphore_aggregation::snark::verifier_api::verify_inside_snark;
 
@@ -54,6 +55,7 @@ fn main() -> Result<()> {
         (circuit_data, proof_with_pis)
     };
 
+    // first recursion
     let mut builder = CircuitBuilder::<F, D>::new(inner_stark_verifier_config);
     let proof_with_pis_t = builder.add_virtual_proof_with_pis(&circuit_data.common);
     let inner_verifier_data_t = builder.constant_verifier_data(&circuit_data.verifier_only);
@@ -70,6 +72,7 @@ fn main() -> Result<()> {
     pw.set_proof_with_pis_target(&proof_with_pis_t, &proof_with_pis);
     let proof_with_pis = circuit_data.prove(pw)?;
 
+    // second recursiion
     let mut builder = CircuitBuilder::<F, D>::new(stark_verifier_config);
     let proof_with_pis_t = builder.add_virtual_proof_with_pis(&circuit_data.common);
     let inner_verifier_data_t = builder.constant_verifier_data(&circuit_data.verifier_only);
@@ -79,7 +82,7 @@ fn main() -> Result<()> {
         &circuit_data.common,
     );
     builder.register_public_inputs(&proof_with_pis_t.public_inputs);
-    let circuit_data = builder.build::<C>();
+    let circuit_data = builder.build::<PoseidonBN128GoldilocksConfig>();
     dbg!(circuit_data.common.degree_bits());
 
     let mut pw = PartialWitness::new();

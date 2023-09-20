@@ -5,12 +5,12 @@ use halo2_proofs::{
     halo2curves::bn256::Fr,
     plonk::*,
 };
-use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField};
+use halo2curves::goldilocks::fp::Goldilocks;
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions, big_to_fe, fe_to_big};
 use itertools::Itertools;
 use poseidon::Spec;
-use poseidon_circuit::{hash::{SpongeConfig, PoseidonHashTable, SpongeChip}, DEFAULT_STEP, poseidon::Pow5Chip};
+use poseidon_circuit::poseidon::{Pow5Chip, Pow5Config};
 use std::marker::PhantomData;
 
 use super::{
@@ -47,15 +47,16 @@ impl<F: FieldExt> MainGateWithRangeConfig<F> {
 }
 
 #[derive(Clone)]
-pub struct Verifier {
+pub struct Verifier<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> {
     proof: ProofValues<Fr, 2>,
     instances: Vec<Fr>,
     vk: VerificationKeyValues<Fr>,
     common_data: CommonData<Fr>,
     spec: Spec<Goldilocks, T, T_MINUS_ONE>,
+    _spec: PhantomData<S>,
 }
 
-impl Verifier {
+impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Verifier<S> {
     pub fn new(
         proof: ProofValues<Fr, 2>,
         instances: Vec<Fr>,
@@ -69,6 +70,7 @@ impl Verifier {
             vk,
             common_data,
             spec,
+            _spec: std::marker::PhantomData
         }
     }
 
@@ -145,13 +147,16 @@ impl Verifier {
     }
 }
 
+const WIDTH: usize = 3;
+const RATE: usize = 2;
+
 #[derive(Clone)]
 pub struct VerifierConfig {
-    pub hasher_config: SpongeConfig<Fr, Pow5Chip<Fr, 3, 2>>,
-    pub main_gate_config: MainGateWithRangeConfig<Fr>
+    pub hasher_config: Pow5Config<Fr, WIDTH, RATE>,
+    pub main_gate_config: MainGateWithRangeConfig<Fr>,
 }
 
-impl Circuit<Fr> for Verifier {
+impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<Fr> for Verifier<S> {
     type Config = VerifierConfig;
     type FloorPlanner = V1;
 
@@ -162,13 +167,29 @@ impl Circuit<Fr> for Verifier {
             vk: self.vk.clone(),
             common_data: self.common_data.clone(),
             spec: Spec::new(R_F, R_P),
+            _spec: std::marker::PhantomData
         }
     }
 
     fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
-        let hash_tbl = [0; 6].map(|_| meta.advice_column());
-        let q_enable = meta.fixed_column();
-        let hasher_config = SpongeConfig::configure_sub(meta, (q_enable, hash_tbl), DEFAULT_STEP);
+        let state = (0..WIDTH).map(|_| meta.advice_column()).collect::<Vec<_>>();
+        let hasher_config = {
+            let partial_sbox = meta.advice_column();
+
+            let rc_a = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
+            let rc_b = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
+
+            meta.enable_constant(rc_b[0]);
+
+            Pow5Chip::configure::<S>(
+                meta,
+                state.try_into().unwrap(),
+                partial_sbox,
+                rc_a.try_into().unwrap(),
+                rc_b.try_into().unwrap(),
+            )
+        };
+
         let main_gate_config = MainGateWithRangeConfig::new(meta);
 
         VerifierConfig {
@@ -194,59 +215,47 @@ impl Circuit<Fr> for Verifier {
             layouter.namespace(|| "Assign verification key"),
             &self.vk,
         )?;
-        layouter.assign_region(
+        let plonk_verifier_chip = PlonkVerifierChip::construct(&goldilocks_chip_config);
+
+        let public_inputs_hash = layouter.assign_region(
             || "Verify proof",
             |region| {
                 let ctx = &mut RegionCtx::new(region, 0);
-                let plonk_verifier_chip = PlonkVerifierChip::construct(&goldilocks_chip_config);
-                let public_inputs_hash = plonk_verifier_chip.get_public_inputs_hash(
+                
+                plonk_verifier_chip.get_public_inputs_hash(
                     ctx,
                     &assigned_proof_with_pis.public_inputs,
-                    &self.spec,
-                )?;
-                let challenges = plonk_verifier_chip.get_challenges(
-                    ctx,
-                    &public_inputs_hash,
-                    &assigned_vk.circuit_digest,
-                    &self.common_data,
-                    &assigned_proof_with_pis.proof,
-                    self.common_data.config.num_challenges,
-                    &self.spec,
-                )?;
-                plonk_verifier_chip.verify_proof_with_challenges(
-                    ctx,
-                    &assigned_proof_with_pis.proof,
-                    &public_inputs_hash,
-                    &challenges,
-                    &assigned_vk,
-                    &self.common_data,
                     &self.spec,
                 )
             },
         )?;
+
+        let challenges = plonk_verifier_chip.get_challenges(
+            &mut layouter,
+            &public_inputs_hash,
+            &assigned_vk.circuit_digest,
+            &self.common_data,
+            &assigned_proof_with_pis.proof,
+            self.common_data.config.num_challenges,
+            &config.hasher_config,
+        )?;
+
+        plonk_verifier_chip.verify_proof_with_challenges(
+            layouter.namespace(|| "verify proof with challenges"),
+            &assigned_proof_with_pis.proof,
+            &public_inputs_hash,
+            &challenges,
+            &assigned_vk,
+            &self.common_data,
+            &config.hasher_config,
+            &self.spec,
+        )?;
+
         for (row, public_input) in
             (0..self.instances.len()).zip_eq(assigned_proof_with_pis.public_inputs)
         {
             main_gate.expose_public(layouter.namespace(|| ""), (*public_input).clone(), row)?;
         }
-
-        let message1 = [
-            Fr::from_str_vartime("1").unwrap(),
-            Fr::from_str_vartime("2").unwrap(),
-        ];
-        let message2 = [
-            Fr::from_str_vartime("0").unwrap(),
-            Fr::from_str_vartime("1").unwrap(),
-        ];
-        let poseidon_data = PoseidonHashTable {
-            inputs: vec![message1, message2],
-            ..Default::default()
-        };
-        let poseidon_calcs = 3;
-
-        let chip =
-            SpongeChip::<Fr, DEFAULT_STEP, Pow5Chip<Fr, 3, 2>>::construct(config.hasher_config, &poseidon_data, poseidon_calcs);
-        chip.load(&mut layouter)?;
 
         Ok(())
     }
