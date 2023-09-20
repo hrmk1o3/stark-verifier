@@ -18,8 +18,7 @@ halo2wrong_maingate = { git = "https://github.com/privacy-scaling-explorations/h
 halo2wrong = { git = "https://github.com/privacy-scaling-explorations/halo2wrong.git", package = "halo2wrong", tag = "v2023_02_02" }
 itertools = "0.10.0"
 poseidon = { git = 'https://github.com/DoHoonKim8/poseidon.git' }
-poseidon-circuit = { path = "../../poseidon-circuit" }
-# poseidon-circuit = { git = "https://github.com/scroll-tech/poseidon-circuit" }
+poseidon-circuit = { git = "https://github.com/hrmk1o3/poseidon-circuit", rev = "3687eae" }
 rand = "0.8"
 subtle = "2.4"
 num-integer = "0.1"

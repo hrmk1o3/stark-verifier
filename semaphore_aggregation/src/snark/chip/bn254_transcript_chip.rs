@@ -50,7 +50,7 @@ impl TranscriptChip {
             |region| {
                 let ctx = &mut RegionCtx::new(region, 0);
 
-                State::<_, T>::default()
+                State::<_, STATE_WIDTH>::default()
                     .words()
                     .iter()
                     .map(|word| goldilocks_chip.assign_constant(ctx, *word))

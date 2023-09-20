@@ -141,20 +141,20 @@ impl<F: FieldExt> From<&GateRef<GoldilocksField, 2>> for CustomGateRef<F> {
             "BaseSumGate { num_limbs: 63 } + Base: 2" => {
                 Self(Box::new(BaseSumGateConstrainer { num_limbs: 63 }))
             },
-            "PoseidonGate(PhantomData)<WIDTH=12>" => {
+            "PoseidonGate(PhantomData<plonky2_field::goldilocks_field::GoldilocksField>)<WIDTH=12>" => {
                 Self(Box::new(PoseidonGateConstrainer))
             },
-            "PoseidonMdsGate(PhantomData)<WIDTH=12>" => {
+            "PoseidonMdsGate(PhantomData<plonky2_field::goldilocks_field::GoldilocksField>)<WIDTH=12>" => {
                 Self(Box::new(PoseidonMDSGateConstrainer))
             },
-            "RandomAccessGate { bits: 1, num_copies: 20, num_extra_constants: 0, _phantom: PhantomData }<D=2>" => {
+            "RandomAccessGate { bits: 1, num_copies: 20, num_extra_constants: 0, _phantom: PhantomData<plonky2_field::goldilocks_field::GoldilocksField> }<D=2>" => {
                 Self(Box::new(RandomAccessGateConstrainer {
                     bits: 1,
                     num_copies: 20,
                     num_extra_constants: 0,
                 }))
             },
-            "RandomAccessGate { bits: 4, num_copies: 4, num_extra_constants: 2, _phantom: PhantomData }<D=2>" => {
+            "RandomAccessGate { bits: 4, num_copies: 4, num_extra_constants: 2, _phantom: PhantomData<plonky2_field::goldilocks_field::GoldilocksField> }<D=2>" => {
                 Self(Box::new(RandomAccessGateConstrainer {
                     bits: 4,
                     num_copies: 4,

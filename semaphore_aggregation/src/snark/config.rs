@@ -14,7 +14,6 @@ use plonky2::hash::hashing::{compress, hash_n_to_hash_no_pad, PlonkyPermutation}
 use plonky2::hash::poseidon::{PoseidonHash, SPONGE_RATE, SPONGE_WIDTH};
 use plonky2::plonk::config::{GenericConfig, Hasher};
 use poseidon_circuit::poseidon::primitives::{P128Pow5T3, Spec};
-use poseidon_circuit::poseidon::primitives::p128pow5t3::P128Pow5T3Constants;
 use snark_verifier::util::arithmetic::fe_to_big;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
