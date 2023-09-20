@@ -200,7 +200,7 @@ pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonBN128
     let spec = Spec::<Goldilocks, 12, 11>::new(8, 22);
 
     let verifier_circuit: Verifier<P128Pow5T3<Fr>> = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let prover = MockProver::run(23, &verifier_circuit, vec![instances]).unwrap();
+    let prover = MockProver::run(20, &verifier_circuit, vec![instances]).unwrap();
     prover.assert_satisfied();
     println!("{}", "Mock prover passes".white().bold());
 }
