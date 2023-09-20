@@ -21,7 +21,6 @@ use halo2_proofs::halo2curves::bn256::Fr;
 use halo2curves::{goldilocks::fp::Goldilocks, group::ff::PrimeField, FieldExt};
 use halo2wrong::RegionCtx;
 use poseidon::Spec;
-use poseidon_circuit::poseidon::Pow5Config;
 
 pub struct PlonkVerifierChip<F: FieldExt> {
     pub goldilocks_chip_config: GoldilocksChipConfig<F>,
@@ -166,7 +165,6 @@ impl PlonkVerifierChip<F> {
         challenges: &AssignedProofChallenges<F, 2>,
         vk: &AssignedVerificationKeyValues<F>,
         common_data: &CommonData<F>,
-        hasher_config: &Pow5Config<F, 3, 2>,
         spec: &Spec<Goldilocks, 12, 11>,
     ) -> Result<(), Error> {
         let goldilocks_extension_chip = GoldilocksExtensionChip::new(&self.goldilocks_chip_config);
@@ -249,7 +247,6 @@ impl PlonkVerifierChip<F> {
             FriInstanceInfo::new(&challenges.plonk_zeta, &zeta_next, common_data);
         let fri_chip = FriVerifierChip::construct(
             &self.goldilocks_chip_config,
-            hasher_config,
             spec.clone(),
             &offset,
             common_data.fri_params.clone(),

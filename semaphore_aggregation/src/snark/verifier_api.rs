@@ -24,7 +24,6 @@ use halo2wrong_maingate::{big_to_fe, fe_to_big};
 use itertools::Itertools;
 use plonky2::{field::goldilocks_field::GoldilocksField, plonk::config::PoseidonGoldilocksConfig};
 use poseidon::Spec;
-use poseidon_circuit::poseidon::primitives::P128Pow5T3;
 use rand::rngs::OsRng;
 use snark_verifier::loader::evm::{self, encode_calldata, EvmLoader, ExecutorBuilder};
 use snark_verifier::pcs::kzg::{Gwc19, KzgAs};
@@ -32,7 +31,6 @@ use snark_verifier::system::halo2::transcript::evm::EvmTranscript;
 use snark_verifier::system::halo2::{compile, Config};
 use snark_verifier::verifier::{self, SnarkVerifier};
 
-use super::config::PoseidonBN128GoldilocksConfig;
 use super::types::{
     self, common_data::CommonData, proof::ProofValues, verification_key::VerificationKeyValues,
 };
@@ -199,8 +197,8 @@ pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonGoldi
 
     let spec = Spec::<Goldilocks, 12, 11>::new(8, 22);
 
-    let verifier_circuit: Verifier<P128Pow5T3<Fr>> = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let prover = MockProver::run(26, &verifier_circuit, vec![instances]).unwrap();
+    let verifier_circuit = Verifier::new(proof, instances.clone(), vk, common_data, spec);
+    let prover = MockProver::run(23, &verifier_circuit, vec![instances]).unwrap();
     prover.assert_satisfied();
     println!("{}", "Mock prover passes".white().bold());
 }

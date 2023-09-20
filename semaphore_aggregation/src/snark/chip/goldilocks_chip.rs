@@ -638,7 +638,9 @@ impl<F: FieldExt> GoldilocksChip<F> {
         x: &AssignedFieldValue<F>,
         n_log: usize,
     ) -> Result<(), Error> {
-        let _ = self.to_bits(ctx, x, n_log as usize)?;
+        if cfg!(not(feature = "not-constrain-range-check")) {
+            let _ = self.to_bits(ctx, x, n_log as usize)?;
+        }
 
         Ok(())
     }

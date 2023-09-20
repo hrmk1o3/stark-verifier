@@ -4,7 +4,6 @@ use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
-use semaphore_aggregation::snark::config::PoseidonBN128GoldilocksConfig;
 use semaphore_aggregation::snark::verifier_api::verify_inside_snark_mock;
 // use semaphore_aggregation::snark::verifier_api::verify_inside_snark;
 

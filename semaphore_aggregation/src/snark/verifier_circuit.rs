@@ -10,7 +10,6 @@ use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions, big_to_fe, fe_to_big};
 use itertools::Itertools;
 use poseidon::Spec;
-use poseidon_circuit::poseidon::{Pow5Chip, Pow5Config};
 use std::marker::PhantomData;
 
 use super::{
@@ -47,16 +46,15 @@ impl<F: FieldExt> MainGateWithRangeConfig<F> {
 }
 
 #[derive(Clone)]
-pub struct Verifier<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> {
+pub struct Verifier {
     proof: ProofValues<Fr, 2>,
     instances: Vec<Fr>,
     vk: VerificationKeyValues<Fr>,
     common_data: CommonData<Fr>,
     spec: Spec<Goldilocks, T, T_MINUS_ONE>,
-    _spec: PhantomData<S>,
 }
 
-impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Verifier<S> {
+impl Verifier {
     pub fn new(
         proof: ProofValues<Fr, 2>,
         instances: Vec<Fr>,
@@ -70,7 +68,6 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Verifier<
             vk,
             common_data,
             spec,
-            _spec: std::marker::PhantomData
         }
     }
 
@@ -152,11 +149,10 @@ const RATE: usize = 2;
 
 #[derive(Clone)]
 pub struct VerifierConfig {
-    pub hasher_config: Pow5Config<Fr, WIDTH, RATE>,
     pub main_gate_config: MainGateWithRangeConfig<Fr>,
 }
 
-impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<Fr> for Verifier<S> {
+impl Circuit<Fr> for Verifier {
     type Config = VerifierConfig;
     type FloorPlanner = V1;
 
@@ -167,33 +163,14 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<F
             vk: self.vk.clone(),
             common_data: self.common_data.clone(),
             spec: Spec::new(R_F, R_P),
-            _spec: std::marker::PhantomData
         }
     }
 
     fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
-        let state = (0..WIDTH).map(|_| meta.advice_column()).collect::<Vec<_>>();
-        let hasher_config = {
-            let partial_sbox = meta.advice_column();
-
-            let rc_a = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
-            let rc_b = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
-
-            meta.enable_constant(rc_b[0]);
-
-            Pow5Chip::configure::<S>(
-                meta,
-                state.try_into().unwrap(),
-                partial_sbox,
-                rc_a.try_into().unwrap(),
-                rc_b.try_into().unwrap(),
-            )
-        };
-
         let main_gate_config = MainGateWithRangeConfig::new(meta);
 
         VerifierConfig {
-            hasher_config, main_gate_config
+            main_gate_config
         }
     }
 
@@ -247,7 +224,6 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<F
             &challenges,
             &assigned_vk,
             &self.common_data,
-            &config.hasher_config,
             &self.spec,
         )?;
 

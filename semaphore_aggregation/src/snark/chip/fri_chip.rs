@@ -7,7 +7,6 @@ use halo2wrong_maingate::{power_of_two, Term, AssignedCondition};
 use itertools::Itertools;
 use plonky2::util::reverse_index_bits_in_place;
 use poseidon::Spec;
-use poseidon_circuit::poseidon::Pow5Config;
 
 use crate::snark::types::{
     assigned::{
@@ -28,7 +27,6 @@ use super::{
 
 pub struct FriVerifierChip<F: FieldExt> {
     goldilocks_chip_config: GoldilocksChipConfig<F>,
-    hasher_config: Pow5Config<F, 3, 2>,
     spec: Spec<Goldilocks, 12, 11>,
     /// Representative `g` of the coset used in FRI, so that LDEs in FRI are done over `gH`.
     offset: AssignedFieldValue<F>,
@@ -41,14 +39,12 @@ type F = Fr;
 impl FriVerifierChip<F> {
     pub fn construct(
         goldilocks_chip_config: &GoldilocksChipConfig<F>,
-        hasher_config: &Pow5Config<F, 3, 2>,
         spec: Spec<Goldilocks, 12, 11>,
         offset: &AssignedFieldValue<F>,
         fri_params: FriParams,
     ) -> Self {
         Self {
             goldilocks_chip_config: goldilocks_chip_config.clone(),
-            hasher_config: hasher_config.clone(),
             spec,
             offset: offset.clone(),
             fri_params,
