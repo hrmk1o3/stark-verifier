@@ -56,7 +56,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
     /// permutation here
     pub fn update(
         &mut self,
-        ctx: &mut RegionCtx<'_, F>,
+        // ctx: &mut RegionCtx<'_, F>,
         element: &AssignedFieldValue<F>,
     ) -> Result<(), Error> {
         self.output_buffer.clear();

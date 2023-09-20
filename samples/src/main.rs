@@ -82,7 +82,7 @@ fn main() -> Result<()> {
         &circuit_data.common,
     );
     builder.register_public_inputs(&proof_with_pis_t.public_inputs);
-    let circuit_data = builder.build::<PoseidonBN128GoldilocksConfig>();
+    let circuit_data = builder.build::<C>();
     dbg!(circuit_data.common.degree_bits());
 
     let mut pw = PartialWitness::new();

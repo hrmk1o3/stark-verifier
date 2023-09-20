@@ -2,7 +2,7 @@ use crate::snark::{
     chip::{
         fri_chip::FriVerifierChip,
         goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
-        bn254_transcript_chip::TranscriptChip,
+        transcript_chip::TranscriptChip,
     },
     chip::{goldilocks_extension_chip::GoldilocksExtensionChip, hasher_chip::HasherChip},
     types::{
@@ -63,10 +63,10 @@ impl PlonkVerifierChip<F> {
         common_data: &CommonData<F>,
         assigned_proof: &AssignedProofValues<F, 2>,
         num_challenges: usize,
-        hasher_config: &Pow5Config<F, 3, 2>,
+        hasher_config: &Spec<Goldilocks, T, T_MINUS_ONE>,
     ) -> Result<AssignedProofChallenges<F, 2>, Error> {
         let mut transcript_chip =
-            TranscriptChip::new(layouter, hasher_config, &self.goldilocks_chip_config)?;
+            TranscriptChip::<F, 12, 11, 8>::new(layouter, hasher_config, &self.goldilocks_chip_config)?;
         for e in circuit_digest.elements.iter() {
             transcript_chip.write_scalar(&e)?;
         }

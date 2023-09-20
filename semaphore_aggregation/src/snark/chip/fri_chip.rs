@@ -22,7 +22,7 @@ use crate::snark::types::{
 use super::{
     goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
     goldilocks_extension_chip::GoldilocksExtensionChip,
-    bn254_merkle_proof_chip::MerkleProofChip,
+    merkle_proof_chip::MerkleProofChip,
     vector_chip::VectorChip,
 };
 
@@ -110,7 +110,7 @@ impl FriVerifierChip<F> {
         initial_trees_proof: &AssignedFriInitialTreeProofValues<F>,
     ) -> Result<(), Error> {
         let merkle_proof_chip =
-            MerkleProofChip::new(&self.goldilocks_chip_config, &self.hasher_config);
+            MerkleProofChip::new(&self.goldilocks_chip_config, self.spec.clone());
         for (_, ((evals, merkle_proof), cap)) in initial_trees_proof
             .evals_proofs
             .iter()
@@ -323,7 +323,7 @@ impl FriVerifierChip<F> {
         )?;
 
         let merkle_proof_chip =
-            MerkleProofChip::new(&self.goldilocks_chip_config, &self.hasher_config);
+            MerkleProofChip::new(&self.goldilocks_chip_config, self.spec.clone());
         for (i, &arity_bits) in self.fri_params.reduction_arity_bits.iter().enumerate() {
             let evals = &round_proof.steps[i].evals;
 

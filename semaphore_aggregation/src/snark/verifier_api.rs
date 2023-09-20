@@ -183,7 +183,7 @@ fn report_elapsed(now: Instant) {
 /// Public API for generating Halo2 proof for Plonky2 verifier circuit
 /// feed Plonky2 proof, `VerifierOnlyCircuitData`, `CommonCircuitData`
 /// This runs only mock prover for constraint check
-pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonBN128GoldilocksConfig, 2>) {
+pub fn verify_inside_snark_mock(proof: ProofTuple<GoldilocksField, PoseidonGoldilocksConfig, 2>) {
     let (proof_with_public_inputs, vd, cd) = proof;
 
     // proof_with_public_inputs -> ProofValues type

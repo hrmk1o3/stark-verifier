@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use halo2_proofs::plonk::Error;
+use halo2_proofs::{plonk::Error, circuit::Layouter};
 use halo2curves::{goldilocks::fp::Goldilocks, FieldExt};
 use halo2wrong::RegionCtx;
 use halo2wrong_maingate::AssignedCondition;
@@ -17,7 +17,7 @@ use super::{
 
 pub struct MerkleProofChip<F: FieldExt> {
     goldilocks_chip_config: GoldilocksChipConfig<F>,
-    spec: Spec<Goldilocks, 12, 11>,
+    hasher_config: Spec<Goldilocks, 12, 11>,
     _marker: PhantomData<F>,
 }
 
@@ -28,7 +28,7 @@ impl<F: FieldExt> MerkleProofChip<F> {
     ) -> Self {
         Self {
             goldilocks_chip_config: goldilocks_chip_config.clone(),
-            spec,
+            hasher_config: spec,
             _marker: PhantomData,
         }
     }
@@ -38,18 +38,24 @@ impl<F: FieldExt> MerkleProofChip<F> {
     }
 
     fn hasher(&self, ctx: &mut RegionCtx<'_, F>) -> Result<HasherChip<F, 12, 11, 8>, Error> {
-        HasherChip::new(ctx, &self.spec, &self.goldilocks_chip_config)
+        HasherChip::new(ctx, &self.hasher_config, &self.goldilocks_chip_config)
     }
 
     pub fn verify_merkle_proof_to_cap_with_cap_index(
         &self,
-        ctx: &mut RegionCtx<'_, F>,
+        // ctx: &mut RegionCtx<'_, F>,
+        mut layouter: impl Layouter<F>,
         leaf_data: &Vec<AssignedFieldValue<F>>,
         leaf_index_bits: &[AssignedCondition<F>],
         cap_index: &AssignedFieldValue<F>,
         merkle_cap: &AssignedMerkleCapValues<F>,
         proof: &AssignedMerkleProofValues<F>,
     ) -> Result<(), Error> {
+        layouter.assign_region(
+            || "verify_merkle_proof_to_cap_with_cap_index",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+
         let mut hasher = self.hasher(ctx)?;
         let goldilocks_chip = self.goldilocks_chip();
 
@@ -89,5 +95,7 @@ impl<F: FieldExt> MerkleProofChip<F> {
         }
 
         Ok(())
+
+        })
     }
 }

@@ -237,7 +237,7 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<F
             &self.common_data,
             &assigned_proof_with_pis.proof,
             self.common_data.config.num_challenges,
-            &config.hasher_config,
+            &self.spec,
         )?;
 
         plonk_verifier_chip.verify_proof_with_challenges(
