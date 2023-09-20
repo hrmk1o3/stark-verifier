@@ -581,7 +581,10 @@ impl<F: FieldExt> GoldilocksChip<F> {
         cond: &AssignedCondition<F>,
     ) -> Result<AssignedFieldValue<F>, Error> {
         let main_gate = self.main_gate();
-        Ok(main_gate.select(ctx, &a, &b, cond)?.into())
+        let result: AssignedFieldValue<F> = main_gate.select(ctx, a, b, cond)?.into();
+        self.assert_in_field(ctx, &result)?;
+
+        Ok(result)
     } // OK
 
     pub fn is_zero(

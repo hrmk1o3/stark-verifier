@@ -5,10 +5,15 @@ use crate::snark::{
         AssignedMerkleCapValues,
     },
 };
-use halo2_proofs::circuit::Layouter;
 use halo2_proofs::halo2curves::bn256::Fr;
 use halo2_proofs::plonk::Error;
+use halo2_proofs::{
+    arithmetic::Field,
+    circuit::{Layouter, Value},
+};
+use halo2curves::goldilocks::fp::Goldilocks;
 use halo2wrong::RegionCtx;
+use halo2wrong_maingate::AssignedCondition;
 use poseidon::State;
 use poseidon_circuit::poseidon::primitives::P128Pow5T3;
 use poseidon_circuit::poseidon::Pow5Config;
@@ -20,6 +25,7 @@ type F = Fr;
 const T: usize = 3;
 const RATE: usize = 2;
 const STATE_WIDTH: usize = 12;
+const SPONGE_RATE: usize = 8;
 
 // NOTE: implement Challenger
 pub struct TranscriptChip {
@@ -83,7 +89,7 @@ impl TranscriptChip {
             return Ok(());
         }
         let buffered_inputs = self.absorbing.clone();
-        for input_chunk in buffered_inputs.chunks(RATE) {
+        for input_chunk in buffered_inputs.chunks(SPONGE_RATE) {
             self.duplexing(layouter, input_chunk)?;
         }
         self.absorbing.clear();
@@ -101,7 +107,7 @@ impl TranscriptChip {
 
             if self.output_buffer.is_empty() {
                 self.state = self.hasher_chip.permutation(layouter, self.state.clone())?;
-                self.output_buffer = self.state.0[0..RATE].to_vec();
+                self.output_buffer = self.state.0[0..SPONGE_RATE].to_vec();
             }
             output.push(self.output_buffer.pop().unwrap())
         }
@@ -119,7 +125,8 @@ impl TranscriptChip {
         self.state = self.hasher_chip.permutation(layouter, self.state.clone())?;
 
         self.output_buffer.clear();
-        self.output_buffer.extend_from_slice(&self.state.0[0..RATE]);
+        self.output_buffer
+            .extend_from_slice(&self.state.0[0..SPONGE_RATE]);
         Ok(())
     }
 
@@ -132,7 +139,21 @@ impl TranscriptChip {
         // Flush the input que
         self.absorbing.clear();
 
-        for chunk in inputs.chunks(RATE) {
+        let goldilocks_chip = self.hasher_chip.goldilocks_chip();
+        let zero = layouter.assign_region(
+            || "assign constant zero",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+
+                goldilocks_chip.assign_constant(ctx, Goldilocks::zero())
+            },
+        )?;
+
+        for word in self.state.0.iter_mut() {
+            *word = zero.clone();
+        }
+
+        for chunk in inputs.chunks(SPONGE_RATE) {
             for (word, input) in self.state.0.iter_mut().zip(chunk.iter()) {
                 *word = input.clone();
             }
@@ -141,7 +162,7 @@ impl TranscriptChip {
 
         let mut outputs = vec![];
         loop {
-            for item in self.state.0.iter().take(RATE) {
+            for item in self.state.0.iter().take(SPONGE_RATE) {
                 outputs.push(item.clone());
                 if outputs.len() == num_outputs {
                     return Ok(outputs);
@@ -149,6 +170,62 @@ impl TranscriptChip {
             }
             self.state = self.hasher_chip.permutation(layouter, self.state.clone())?;
         }
+    }
+
+    pub fn compress(
+        &mut self,
+        layouter: &mut impl Layouter<F>,
+        x: AssignedHashValues<F>,
+        y: AssignedHashValues<F>,
+    ) -> Result<AssignedHashValues<F>, Error> {
+        let mut inputs = vec![];
+        inputs.extend_from_slice(&x.elements);
+        inputs.extend_from_slice(&y.elements);
+        let output = self.hash_n_to_m_no_pad(layouter, inputs, 4)?;
+
+        Ok(AssignedHashValues {
+            elements: output.try_into().unwrap(),
+        })
+    }
+
+    pub fn permute_swapped(
+        &mut self,
+        layouter: &mut impl Layouter<F>,
+        x: AssignedHashValues<F>,
+        y: AssignedHashValues<F>,
+        b: &AssignedCondition<F>,
+    ) -> Result<AssignedHashValues<F>, Error> {
+        let goldilocks_chip = self.hasher_chip.goldilocks_chip();
+        let (left, right) = layouter.assign_region(
+            || "addition in the Goldilocks field",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+
+                let mut left = vec![];
+                let mut right = vec![];
+                for (x, y) in x.elements.iter().zip(y.elements.iter()) {
+                    goldilocks_chip.assert_in_field(ctx, x)?;
+                    goldilocks_chip.assert_in_field(ctx, y)?;
+                    let l = goldilocks_chip.select(ctx, y, x, b)?;
+                    let r = goldilocks_chip.select(ctx, x, y, b)?;
+
+                    left.push(l);
+                    right.push(r);
+                }
+
+                Ok((left, right))
+            },
+        )?;
+
+        self.compress(
+            layouter,
+            AssignedHashValues {
+                elements: left.try_into().unwrap(),
+            },
+            AssignedHashValues {
+                elements: right.try_into().unwrap(),
+            },
+        )
     }
 
     // pub fn permute(
@@ -164,7 +241,7 @@ impl TranscriptChip {
 
     //     let mut outputs = vec![];
     //     loop {
-    //         for item in self.state.0.iter().take(RATE) {
+    //         for item in self.state.0.iter().take(SPONGE_RATE) {
     //             outputs.push(item.clone());
     //             if outputs.len() == num_output {
     //                 return Ok(outputs);
