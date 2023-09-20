@@ -127,8 +127,6 @@ impl<F: FieldExt, S: Spec<F, T, RATE>, const T: usize, const RATE: usize>
             &state.try_into().unwrap(),
         )?;
 
-        dbg!(format!("{:?}", new_state[0].0.value()));
-
         let output = layouter.assign_region(
             || "Verify proof",
             |region| {
@@ -250,16 +248,13 @@ mod tests {
 
         pub fn degree_bits(&self) -> u32 {
             if cfg!(feature = "not-constrain-range-check") {
-                7
-            } else {
                 6
+            } else {
+                7
             }
         }
 
         pub fn instance(&self) -> Vec<Vec<Fr>> {
-            for v in self.output.iter() {
-                dbg!(v);
-            }
             let first_column = self
                 .output
                 .map(|v| fe_from_big::<Fr>(fe_to_big::<Goldilocks>(v)))
@@ -358,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn test_permutation_circuit() {
+    fn test_bn254_permutation_circuit() {
         let mut input = [Goldilocks::zero(); STATE_WIDTH];
         input[0] = Goldilocks::from(1u64);
         input[4] = Goldilocks::from(2u64);

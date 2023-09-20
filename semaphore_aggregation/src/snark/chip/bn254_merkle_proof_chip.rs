@@ -11,11 +11,12 @@ use poseidon_circuit::poseidon::{Pow5Config, Pow5Chip, primitives::P128Pow5T3};
 use crate::snark::types::assigned::{AssignedMerkleCapValues, AssignedMerkleProofValues, AssignedFieldValue};
 
 use super::{
+    bn254_transcript_chip::TranscriptChip,
     goldilocks_chip::{GoldilocksChip, GoldilocksChipConfig},
     vector_chip::VectorChip,
 };
 
-const HASH_OUT_SIZE: usize = 1;
+const HASH_OUT_SIZE: usize = 4;
 
 pub struct MerkleProofChip<F: FieldExt> {
     goldilocks_chip_config: GoldilocksChipConfig<F>,
@@ -44,10 +45,14 @@ impl MerkleProofChip<F> {
         GoldilocksChip::new(&self.goldilocks_chip_config)
     }
 
-    fn hasher(&self) -> Result<Pow5Chip<F, 3, 2>, Error> {
-        let chip = Pow5Chip::construct(self.hasher_config.clone());
+    fn sponge_chip(&self, layouter: &mut impl Layouter<F>) -> Result<TranscriptChip, Error> {
+        let sponge_chip = TranscriptChip::new(
+            layouter,
+            &self.hasher_config,
+            &self.goldilocks_chip_config,
+        )?;
 
-        Ok(chip)
+        Ok(sponge_chip)
     }
 
     pub fn verify_merkle_proof_to_cap_with_cap_index(
@@ -59,25 +64,24 @@ impl MerkleProofChip<F> {
         merkle_cap: &AssignedMerkleCapValues<F>,
         proof: &AssignedMerkleProofValues<F>,
     ) -> Result<(), Error> {
-        let hasher_chip = self.hasher()?;
-
         let goldilocks_chip = self.goldilocks_chip();
 
         let mut state = if leaf_data.len() <= HASH_OUT_SIZE {
             leaf_data.to_vec()
         } else {
-            let hasher: poseidon_circuit::poseidon::Hash<F,_,P128Pow5T3<F>,3,2> = poseidon_circuit::poseidon::Hash::init(
-                hasher_chip.clone(),
-                layouter.namespace(|| "init"),
-                &[F::from_u128(leaf_data.len() as u128)] // ConstantLength<L>::initial_capacity_elements()
-            ).unwrap();
-            let output = hasher.hash(
-                layouter.namespace(|| "leaf hash"),
-                &leaf_data.iter().map(|v| (**v).clone()).collect::<Vec<_>>()
-            ).unwrap().into();
-
-            vec![output]
+            // let hasher: poseidon_circuit::poseidon::Hash<F,_,P128Pow5T3<F>,3,2> = poseidon_circuit::poseidon::Hash::init(
+            //     hasher_chip.clone(),
+            //     layouter.namespace(|| "init"),
+            //     &[F::from_u128(leaf_data.len() as u128)] // ConstantLength<L>::initial_capacity_elements()
+            // ).unwrap();
+            // let output = hasher.hash(
+            //     layouter.namespace(|| "leaf hash"),
+            //     &leaf_data.iter().map(|v| (**v).clone()).collect::<Vec<_>>()
+            // ).unwrap().into();
             // state = hasher.hash(ctx, leaf_data.clone(), HASH_OUT_SIZE)?;
+            let mut sponge_chip = self.sponge_chip(&mut layouter)?;
+
+            sponge_chip.hash_n_to_m_no_pad(&mut layouter, leaf_data.to_vec(), HASH_OUT_SIZE)?
         };
         debug_assert_eq!(state.len(), HASH_OUT_SIZE);
 
@@ -103,17 +107,10 @@ impl MerkleProofChip<F> {
                     Ok(inputs)
                 }
             )?;
-            
-            // let mut hasher = self.hasher(ctx)?;
-            // state = hasher.permute(ctx, inputs, 4)?;
-            let inputs = inputs.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
-            let hasher: poseidon_circuit::poseidon::Hash<_,_,P128Pow5T3<F>,3,2> = poseidon_circuit::poseidon::Hash::init(
-                hasher_chip.clone(),
-                layouter.namespace(|| "init"),
-                &[F::from_u128(2 * HASH_OUT_SIZE as u128)] // ConstantLength<L>::initial_capacity_elements()
-            ).unwrap();
-            let outputs = hasher.hash(layouter.namespace(|| "interior hash"), &inputs).unwrap().into();
-            state = vec![outputs];
+
+            let mut sponge_chip = self.sponge_chip(&mut layouter)?;
+
+            state = sponge_chip.hash_n_to_m_no_pad(&mut layouter, inputs, HASH_OUT_SIZE)?;
         }
 
         layouter.assign_region(

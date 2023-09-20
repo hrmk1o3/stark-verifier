@@ -72,9 +72,7 @@ impl PlonkyPermutation<F> for PoseidonBN128Permutation<F> {
             Fr::from_raw([state[4], state[5], state[6], state[7]]),
             Fr::from_raw([state[8], state[9], state[10], state[11]]),
         ];
-        dbg!(expected_output_value);
 
-        dbg!("2");
         let (round_constants, mds, _) = P128Pow5T3::<Fr>::constants();
         poseidon_circuit::poseidon::primitives::permute::<
             Fr,
@@ -82,8 +80,6 @@ impl PlonkyPermutation<F> for PoseidonBN128Permutation<F> {
             3,
             2,
         >(&mut expected_output_value, &mds, &round_constants);
-        dbg!("3");
-        dbg!(expected_output_value);
 
         let modulus = BigUint::from(F::ORDER);
 

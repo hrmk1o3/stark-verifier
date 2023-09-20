@@ -123,7 +123,7 @@ impl TranscriptChip {
         Ok(())
     }
 
-    pub fn hash(
+    pub fn hash_n_to_m_no_pad(
         &mut self,
         layouter: &mut impl Layouter<F>,
         inputs: Vec<AssignedFieldValue<F>>,

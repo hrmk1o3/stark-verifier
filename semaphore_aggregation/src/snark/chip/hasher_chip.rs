@@ -312,7 +312,7 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
         Ok(())
     }
 
-    pub fn hash(
+    pub fn hash_n_to_m_no_pad(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
         inputs: Vec<AssignedFieldValue<F>>,
@@ -340,6 +340,15 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
         }
     }
 
+    pub fn hash(
+        &mut self,
+        ctx: &mut RegionCtx<'_, F>,
+        inputs: Vec<AssignedFieldValue<F>>,
+        num_outputs: usize,
+    ) -> Result<Vec<AssignedFieldValue<F>>, Error> {
+        self.hash_n_to_m_no_pad(ctx, inputs, num_outputs)
+    }
+
     pub fn permute(
         &mut self,
         ctx: &mut RegionCtx<'_, F>,
@@ -361,5 +370,154 @@ impl<F: FieldExt, const T: usize, const T_MINUS_ONE: usize, const RATE: usize>
             }
             self.permutation(ctx)?;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use halo2_proofs::{
+        arithmetic::Field,
+        circuit::{floor_planner::V1, *},
+        dev::MockProver,
+        halo2curves::bn256::Fr,
+        plonk::*,
+    };
+    use halo2curves::goldilocks::fp::Goldilocks;
+    use halo2wrong_maingate::{fe_to_big, MainGate, MainGateInstructions};
+    use plonky2::{
+        field::{
+            goldilocks_field::GoldilocksField,
+            types::{Field as Plonky2Field, PrimeField64},
+        },
+        hash::poseidon::PoseidonHash,
+        plonk::config::Hasher,
+    };
+    use snark_verifier::util::arithmetic::fe_from_big;
+
+    use crate::snark::verifier_circuit::MainGateWithRangeConfig;
+
+    use super::*;
+
+    #[derive(Default)]
+    pub struct GoldilocksPoseidonPermutationCircuit {
+        pub input: [Goldilocks; STATE_WIDTH],
+        pub output: [Goldilocks; 4],
+    }
+
+    impl GoldilocksPoseidonPermutationCircuit {
+        pub fn new(input: [Goldilocks; STATE_WIDTH]) -> Self {
+            let output =
+                PoseidonHash::hash_no_pad(&input.map(|v| GoldilocksField::from_canonical_u64(v.0)));
+            let output = output.elements.map(|v| Goldilocks(v.to_canonical_u64()));
+
+            Self { input, output }
+        }
+
+        pub fn degree_bits(&self) -> u32 {
+            if cfg!(feature = "not-constrain-range-check") {
+                11
+            } else {
+                12
+            }
+        }
+
+        pub fn instance(&self) -> Vec<Vec<Fr>> {
+            let first_column = self.output[0..4]
+                .iter()
+                .map(|v| fe_from_big::<Fr>(fe_to_big::<Goldilocks>(*v)))
+                .collect::<Vec<_>>();
+
+            vec![first_column]
+        }
+    }
+
+    const STATE_WIDTH: usize = 12;
+
+    #[derive(Clone)]
+    pub struct GoldilocksPoseidonPermutationConfig {
+        pub goldilocks_chip_config: GoldilocksChipConfig<Fr>,
+        pub spec: Spec<Goldilocks, 12, 11>,
+    }
+
+    impl Circuit<Fr> for GoldilocksPoseidonPermutationCircuit {
+        type Config = GoldilocksPoseidonPermutationConfig;
+        type FloorPlanner = V1;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
+            let main_gate_config = MainGateWithRangeConfig::new(meta);
+            let goldilocks_chip_config =
+                GoldilocksChip::configure(&main_gate_config.main_gate_config);
+            let spec = Spec::<Goldilocks, 12, 11>::new(8, 22);
+
+            GoldilocksPoseidonPermutationConfig {
+                goldilocks_chip_config,
+                spec,
+            }
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<Fr>,
+        ) -> Result<(), Error> {
+            let main_gate = MainGate::new(config.goldilocks_chip_config.main_gate_config.clone());
+            let goldilocks_chip = GoldilocksChip::new(&config.goldilocks_chip_config);
+
+            let output_assigned = layouter.assign_region(
+                || "addition in the Goldilocks field",
+                |region| {
+                    let ctx = &mut RegionCtx::new(region, 0);
+
+                    let mut hasher_chip = HasherChip::<Fr, 12, 11, 8>::new(
+                        ctx,
+                        &config.spec,
+                        &config.goldilocks_chip_config,
+                    )?;
+                    let input_assigned = self
+                        .input
+                        .iter()
+                        .map(|value| goldilocks_chip.assign_value(ctx, Value::known(*value)))
+                        .collect::<Result<Vec<_>, Error>>()?;
+                    let output_assigned = hasher_chip.hash_n_to_m_no_pad(ctx, input_assigned, 4)?;
+                    for (expected_value, actual_assigned) in
+                        self.output.iter().zip(output_assigned.iter())
+                    {
+                        let expected_assigned =
+                            goldilocks_chip.assign_constant(ctx, *expected_value)?;
+                        main_gate.assert_equal(ctx, actual_assigned, &expected_assigned)?;
+                    }
+
+                    Ok(output_assigned)
+                },
+            )?;
+
+            for (row, v) in output_assigned.iter().enumerate() {
+                main_gate.expose_public(
+                    layouter.namespace(|| format!("public input {row}")),
+                    v.value.clone(),
+                    row,
+                )?;
+            }
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_goldilocks_permutation_circuit() {
+        let mut input = [Goldilocks::zero(); STATE_WIDTH];
+        input[0] = Goldilocks::from(1u64);
+        input[4] = Goldilocks::from(2u64);
+        let circuit = GoldilocksPoseidonPermutationCircuit::new(input);
+        let instance = circuit.instance();
+        let k = circuit.degree_bits();
+
+        // runs mock prover
+        let mock_prover = MockProver::run(k, &circuit, instance).unwrap();
+        mock_prover.assert_satisfied();
     }
 }
