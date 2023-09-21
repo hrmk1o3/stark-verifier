@@ -4,5 +4,5 @@ members = ["semaphore_aggregation", "samples"]
 [patch."https://github.com/DoHoonKim8/plonky2"]
 plonky2 = { git = "https://github.com/InternetMaximalism/plonky2", rev = "3fa196a" }
 
-[patch."https://github.com/privacy-scaling-explorations/halo2.git"]
-halo2_proofs = { git = "https://github.com/scroll-tech/halo2.git", branch = "develop" }
+# [patch."https://github.com/privacy-scaling-explorations/halo2.git"]
+# halo2_proofs = { git = "https://github.com/scroll-tech/halo2.git", branch = "develop" }

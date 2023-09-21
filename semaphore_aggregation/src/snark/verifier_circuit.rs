@@ -10,7 +10,7 @@ use halo2wrong::RegionCtx;
 use halo2wrong_maingate::{MainGate, MainGateConfig, MainGateInstructions, big_to_fe, fe_to_big};
 use itertools::Itertools;
 use poseidon::Spec;
-use poseidon_circuit::poseidon::{Pow5Chip, Pow5Config};
+use poseidon_circuit::poseidon::{Pow5Chip, Pow5Config, primitives::P128Pow5T3};
 use std::marker::PhantomData;
 
 use super::{
@@ -47,16 +47,15 @@ impl<F: FieldExt> MainGateWithRangeConfig<F> {
 }
 
 #[derive(Clone)]
-pub struct Verifier<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> {
+pub struct Verifier {
     proof: ProofValues<Fr, 2>,
     instances: Vec<Fr>,
     vk: VerificationKeyValues<Fr>,
     common_data: CommonData<Fr>,
     spec: Spec<Goldilocks, T, T_MINUS_ONE>,
-    _spec: PhantomData<S>,
 }
 
-impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Verifier<S> {
+impl Verifier {
     pub fn new(
         proof: ProofValues<Fr, 2>,
         instances: Vec<Fr>,
@@ -69,8 +68,7 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Verifier<
             instances,
             vk,
             common_data,
-            spec,
-            _spec: std::marker::PhantomData
+            spec
         }
     }
 
@@ -156,7 +154,7 @@ pub struct VerifierConfig {
     pub main_gate_config: MainGateWithRangeConfig<Fr>,
 }
 
-impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<Fr> for Verifier<S> {
+impl Circuit<Fr> for Verifier {
     type Config = VerifierConfig;
     type FloorPlanner = V1;
 
@@ -167,7 +165,6 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<F
             vk: self.vk.clone(),
             common_data: self.common_data.clone(),
             spec: Spec::new(R_F, R_P),
-            _spec: std::marker::PhantomData
         }
     }
 
@@ -181,7 +178,7 @@ impl<S: poseidon_circuit::poseidon::primitives::Spec<Fr, WIDTH, RATE>> Circuit<F
 
             meta.enable_constant(rc_b[0]);
 
-            Pow5Chip::configure::<S>(
+            Pow5Chip::configure::<P128Pow5T3<Fr>>(
                 meta,
                 state.try_into().unwrap(),
                 partial_sbox,

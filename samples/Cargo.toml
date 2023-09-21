@@ -12,3 +12,4 @@ semaphore_aggregation = { path = "../semaphore_aggregation" }
 
 [features]
 not-constrain-range-check = ["semaphore_aggregation/not-constrain-range-check"]
+print_layout = ["semaphore_aggregation/print_layout"]
