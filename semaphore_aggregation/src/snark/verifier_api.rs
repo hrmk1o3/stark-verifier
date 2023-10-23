@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
@@ -179,6 +180,7 @@ fn report_elapsed(now: Instant) {
     );
 }
 
+const K: u32 = 20;
 const D: usize = 2;
 type Plonky2Config = PoseidonBN128GoldilocksConfig;
 type F = <Plonky2Config as GenericConfig<D>>::F;
@@ -203,7 +205,7 @@ pub fn verify_inside_snark_mock(proof: ProofTuple<F, Plonky2Config, D>) {
     let spec = Spec::<Goldilocks, 12, 11>::new(8, 22);
 
     let verifier_circuit = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let prover = MockProver::run(20, &verifier_circuit, vec![instances]).unwrap();
+    let prover = MockProver::run(K, &verifier_circuit, vec![instances]).unwrap();
     prover.assert_satisfied();
     println!("{}", "Mock prover passes".white().bold());
 }
@@ -255,7 +257,7 @@ pub fn verify_inside_snark(proof: ProofTuple<F, Plonky2Config, D>) {
 
     // runs mock prover
     let circuit = Verifier::new(proof, instances.clone(), vk, common_data, spec);
-    let mock_prover = MockProver::run(20, &circuit, vec![instances.clone()]).unwrap();
+    let mock_prover = MockProver::run(K, &circuit, vec![instances.clone()]).unwrap();
     mock_prover.assert_satisfied();
     println!("{}", "Mock prover passes".white().bold());
 
@@ -270,5 +272,18 @@ pub fn verify_inside_snark(proof: ProofTuple<F, Plonky2Config, D>) {
     let proof = EvmVerifier::gen_proof(srs, &pk, circuit.clone(), vec![instances.clone()]);
     println!("{}", "SNARK proof generated successfully!".white().bold());
     report_elapsed(now);
+
+    let deployment_code_hex = "0x".to_string() + &hex::encode(deployment_code.clone());
+    let mut code_file = std::fs::File::create("deployment_code_hex.txt").unwrap();
+    code_file.write_all(deployment_code_hex.as_bytes()).unwrap();
+
+    let calldata = encode_calldata(&[instances.clone()], &proof);
+    let calldata_hex = "0x".to_string() + &hex::encode(calldata);
+    let mut file = std::fs::File::create("calldata_hex.txt").unwrap();
+    file.write_all(calldata_hex.as_bytes()).unwrap();
+
+    let mut proof_file = std::fs::File::create("proof.txt").expect("creation failed");
+    proof_file.write_all(&proof).expect("write failed");
+
     EvmVerifier::evm_verify(deployment_code, vec![instances], proof);
 }

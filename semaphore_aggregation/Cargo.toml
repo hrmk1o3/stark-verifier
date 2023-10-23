@@ -16,6 +16,7 @@ halo2_proofs = { git = "https://github.com/privacy-scaling-explorations/halo2.gi
 halo2wrong_transcript = { git = "https://github.com/privacy-scaling-explorations/halo2wrong.git", package = "transcript", tag = "v2023_02_02" }
 halo2wrong_maingate = { git = "https://github.com/privacy-scaling-explorations/halo2wrong.git", package = "maingate", tag = "v2023_02_02" }
 halo2wrong = { git = "https://github.com/privacy-scaling-explorations/halo2wrong.git", package = "halo2wrong", tag = "v2023_02_02" }
+hex = "0.4.3"
 itertools = "0.10.0"
 poseidon = { git = 'https://github.com/DoHoonKim8/poseidon.git' }
 poseidon-circuit = { git = "https://github.com/hrmk1o3/poseidon-circuit", rev = "9f56f4e" }
